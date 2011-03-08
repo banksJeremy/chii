@@ -1,0 +1,10 @@
+syntax: glob
+**.old
+**.save
+**.orig
+bot.config
+**.pyc
+**.pyo
+**.DS_Store
+**.log
+commands/muse.py

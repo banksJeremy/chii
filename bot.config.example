@@ -1,0 +1,21 @@
+nickname: chii
+realname: chii
+
+server: irc.esper.net
+port: 6697
+ssl: true
+
+channels:
+- chiisadventure
+
+admins:
+- you!your@host
+
+logging: true
+
+cmd_prefix: .
+cmd_path: commands
+
+imgur_api_key: none
+google_api_key: none
+
