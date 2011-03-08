@@ -1,4 +1,4 @@
-import json, random, urllib2
+import json, random, urllib, urllib2
 from chii import alias, config, register
 
 IMGUR_API_KEY = config.get('imgur_api_key', None)
@@ -48,18 +48,33 @@ def haha(self, nick, host, channel, *args):
 @register
 def bonghits(self, nick, host, channel, *args):
     """what? huh? sorry i'm a little high"""
-    interjections = ['/002cough/002', '...', 'hehe', '    mmm', 'hahah',
-                '/002inhaling/002', '/002random noises/002', 'hey man',
-                'uh...', 'what? yeah...', 'haahAHHA', 'eeek']
+    interjections = ['\002cough\002', '...', 'hehe', '    mmm', 'hahah',
+                     '\002inhaling\002', '\002random noises\002', 'hey man',
+                     'uh...', 'what? yeah...', 'haahAHHA', 'eeek', 'fuck']
 
-    speech = ['/002inhales/002']
+    speech = []
 
-    for word in args:
-        speech.append(word)
-        if int(random()*10) > 5:
-            speech.append(get_random(interjections))
-    speech.append('/002exhales/002')
-    return ' '.join(speech)
+    try:
+        for word in args:
+            speech.append(word)
+            if int(random.random()*10) > 5:
+                speech.append(get_random(interjections))
+        return ' '.join(speech)
+    except Exception as e:
+        return 'bleeping %s! ' % e
+
+@register
+def directions(self, nick, host, channel, *args):
+    """try from -> to, now get lost"""
+    url = 'http://www.mapquest.com/?le=t&q1=%s&q2=%s&maptype=map&vs=directions'
+    if '->' not in args:
+        return 'um try again'
+    try:
+        directions = (urllib.quote(x) for x in ' '.join(args).split('->'))
+        return url % tuple(directions)
+    except Exception as e:
+        return 'ur shit am fuked: %s' % e
+
 
 if IMGUR_API_KEY:
     @register
