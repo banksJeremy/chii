@@ -161,7 +161,10 @@ class Chii(irc.IRCClient):
             if len(msg) > 1:
                 args = msg[1:]
             if self.commands.registry.get(command, None):
-                response = self.commands.registry[command](nick, host, channel, *args)
+                try:
+                    response = self.commands.registry[command](nick, host, channel, *args)
+                except Exception as e:
+                    response = 'ur shit am fuked! %s' % e
                 if response:
                     self.msg(channel, response)
                     self.logger.log("<%s> %s" % (self.nickname, response))

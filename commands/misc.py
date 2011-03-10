@@ -53,15 +53,11 @@ def bonghits(self, nick, host, channel, *args):
                      'uh...', 'what? yeah...', 'haahAHHA', 'eeek', 'fuck']
 
     speech = []
-
-    try:
-        for word in args:
-            speech.append(word)
-            if int(random.random()*10) > 5:
-                speech.append(get_random(interjections))
-        return ' '.join(speech)
-    except Exception as e:
-        return 'bleeping %s! ' % e
+    for word in args:
+        speech.append(word)
+        if int(random.random()*10) > 5:
+            speech.append(get_random(interjections))
+    return ' '.join(speech)
 
 @register
 def directions(self, nick, host, channel, *args):
@@ -69,11 +65,8 @@ def directions(self, nick, host, channel, *args):
     url = 'http://www.mapquest.com/?le=t&q1=%s&q2=%s&maptype=map&vs=directions'
     if '->' not in args:
         return 'um try again'
-    try:
-        directions = (urllib.quote(x) for x in ' '.join(args).split('->'))
-        return url % tuple(directions)
-    except Exception as e:
-        return 'ur shit am fuked: %s' % e
+    directions = (urllib.quote(x) for x in ' '.join(args).split('->'))
+    return url % tuple(directions)
 
 
 if IMGUR_API_KEY:
@@ -82,10 +75,7 @@ if IMGUR_API_KEY:
         """<densy> this mode is full of fail"""
         url = 'http://api.imgur.com/2/stats.json'
         request = urllib2.Request(url, None, {'key': IMGUR_API_KEY})
-        try:
-            response = urllib2.urlopen(request)
-            results = json.load(response)['stats']['most_popular_images']
-            result = get_random(results)
-            return 'densy recommended. doctor approved: http://imgur.com/%s' % str(result)
-        except Exception as e:
-            return 'ur shit am fuked: %s' % e
+        response = urllib2.urlopen(request)
+        results = json.load(response)['stats']['most_popular_images']
+        result = get_random(results)
+        return 'densy recommended. doctor approved: http://imgur.com/%s' % str(result)

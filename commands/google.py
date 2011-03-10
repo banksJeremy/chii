@@ -17,13 +17,10 @@ if GOOGLE_API_KEY:
             return 'u need a query'
         url = 'https://ajax.googleapis.com/ajax/services/search/web?v=1.0&q=%s&key=%s&userip=%s' % (query, GOOGLE_API_KEY, MY_IP)
         request = urllib2.Request(url, None, {'Referer': 'http://quoth.notune.com'})
-        try:
-            response = urllib2.urlopen(request)
-            results = json.load(response)['responseData']['results']
-            title, url = results[0]['titleNoFormatting'], results[0]['url']
-            return 'top result: %s' % str(' - '.join((title, url)))
-        except Exception as e:
-            return 'ur shit am fuked: %s' % e
+        response = urllib2.urlopen(request)
+        result = json.load(response)['responseData']['results'][0]
+        msg = 'top result: %s - %s' % (title, url)
+        return str(msg)
 
     @alias('gb', 'books')
     @register
@@ -35,13 +32,10 @@ if GOOGLE_API_KEY:
             return 'u need a query'
         url = 'https://ajax.googleapis.com/ajax/services/search/books?v=1.0&q=%s&key=%s&userip=%s' % (query, GOOGLE_API_KEY, MY_IP)
         request = urllib2.Request(url, None, {'Referer': 'http://quoth.notune.com'})
-        try:
-            response = urllib2.urlopen(request)
-            results = json.load(response)['responseData']['results']
-            title, url = results[0]['titleNoFormatting'], results[0]['url']
-            return 'top result: %s' % str(' - '.join((title, url)))
-        except Exception as e:
-            return 'ur shit am fuked: %s' % e
+        response = urllib2.urlopen(request)
+        result = json.load(response)['responseData']['results'][0]
+        msg = 'top result: %s - %s' % (title, url)
+        return str(msg)
 
     @alias('gi')
     @register
@@ -53,13 +47,10 @@ if GOOGLE_API_KEY:
             return 'u need a query'
         url = 'https://ajax.googleapis.com/ajax/services/search/images?v=1.0&q=%s&key=%s&userip=%s' % (query, GOOGLE_API_KEY, MY_IP)
         request = urllib2.Request(url, None, {'Referer': 'http://quoth.notune.com'})
-        try:
-            response = urllib2.urlopen(request)
-            results = json.load(response)['responseData']['results']
-            title, url = results[0]['titleNoFormatting'], results[0]['url']
-            return 'top result: %s' % str(' - '.join((title, url)))
-        except Exception as e:
-            return 'ur shit am fuked: %s' % e
+        response = urllib2.urlopen(request)
+        result = json.load(response)['responseData']['results'][0]
+        msg = 'top result: %s - %s' % (title, url)
+        return str(msg)
    
     @alias('gp', 'patent')
     @register
@@ -71,13 +62,29 @@ if GOOGLE_API_KEY:
             return 'u need a query'
         url = 'https://ajax.googleapis.com/ajax/services/search/patent?v=1.0&q=%s&key=%s&userip=%s' % (query, GOOGLE_API_KEY, MY_IP)
         request = urllib2.Request(url, None, {'Referer': 'http://quoth.notune.com'})
-        try:
-            response = urllib2.urlopen(request)
-            results = json.load(response)['responseData']['results']
-            title, url = results[0]['titleNoFormatting'], results[0]['url']
-            return 'top result: %s' % str(' - '.join((title, url)))
-        except Exception as e:
-            return 'ur shit am fuked: %s' % e
+        response = urllib2.urlopen(request)
+        result = json.load(response)['responseData']['results'][0]
+        msg = 'top result: %s - %s' % (title, url)
+        return str(msg)
+
+    @alias('gv', 'youtube', 'yt')
+    @register
+    def google_video(self, nick, host, channel, *args):
+        """searches for videos"""
+        if args:
+            query = '%20'.join(args)
+        else:
+            return 'u need a query'
+        url = 'https://ajax.googleapis.com/ajax/services/search/video?v=1.0&q=%s&key=%s&userip=%s' % (query, GOOGLE_API_KEY, MY_IP)
+        request = urllib2.Request(url, None, {'Referer': 'http://quoth.notune.com'})
+        response = urllib2.urlopen(request)
+        results = json.load(response)['responseData']['results']
+        title, url = results[0]['titleNoFormatting'], results[0]['url']
+        if 'youtube' in url:
+            url = re.search(YOUTUBE_PATTERN, url).group()
+            url = url.replace('%3F', '?').replace('%3D', '=')
+        msg = 'top result: %s - %s' % (title, url)
+        return str(msg)
 
     @alias('gt', 'translate')
     @register
@@ -91,32 +98,6 @@ if GOOGLE_API_KEY:
 
         url = 'https://ajax.googleapis.com/ajax/services/language/translate?v=1.0&q=%s&langpair=%s' % (query, language_pair)
         request = urllib2.Request(url, None, {'Referer': 'http://quoth.notune.com'})
-        try:
-            response = urllib2.urlopen(request)
-            results = json.load(response)['responseData']['translatedText']
-            return str(results)
-        except Exception as e:
-            return 'ur shit am fuked: %s' % e
- 
-
-    @alias('gv', 'youtube', 'yt')
-    @register
-    def google_video(self, nick, host, channel, *args):
-        """searches for videos"""
-        if args:
-            query = '%20'.join(args)
-        else:
-            return 'u need a query'
-        url = 'https://ajax.googleapis.com/ajax/services/search/video?v=1.0&q=%s&key=%s&userip=%s' % (query, GOOGLE_API_KEY, MY_IP)
-        request = urllib2.Request(url, None, {'Referer': 'http://quoth.notune.com'})
-        try:
-            response = urllib2.urlopen(request)
-            results = json.load(response)['responseData']['results']
-            title, url = results[0]['titleNoFormatting'], results[0]['url']
-            if 'youtube' in url:
-                url = re.search(YOUTUBE_PATTERN, url).group()
-                url = url.replace('%3F', '?').replace('%3D', '=')
-            return 'top result: %s' % str(' - '.join((title, url)))
-        except Exception as e:
-            return 'ur shit am fuked: %s' % e
-   
+        response = urllib2.urlopen(request)
+        results = json.load(response)['responseData']['translatedText']
+        return str(results)
