@@ -28,6 +28,7 @@ if os.path.isfile(CONFIG_FILE):
 def command(*args, **kwargs):
     """Decorator which adds callable to command registry"""
     if args and not hasattr(args[0], '__call__') or kwargs:
+        # decorator used with args for aliases or keyward arg
         def decorator(func):
             def wrapper(*func_args, **func_kwargs):
                 return func(*func_args, **func_kwargs)
@@ -37,6 +38,7 @@ def command(*args, **kwargs):
             if args:
                 wrapper._command_names = (func.__name__,) + args
             else:
+                # used with keyword arg but not alias names!
                 wrapper._command_names = (func.__name__,)
             if 'restrict' in kwargs:
                 wrapper._restrict = kwargs['restrict']
@@ -44,7 +46,9 @@ def command(*args, **kwargs):
                 wrapper._restrict = None
             return wrapper
         return decorator
+    
     else:
+        # used without any args
         func = args[0]
         def wrapper(*func_args, **func_kwargs):
             return func(*func_args, **func_kwargs)
