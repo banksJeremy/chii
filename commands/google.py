@@ -1,5 +1,5 @@
 import json, urllib, urllib2, re
-from chii import alias, config, register
+from chii import command, config
 
 GOOGLE_API_KEY = config.get('google_api_key', None)
 
@@ -7,8 +7,7 @@ if GOOGLE_API_KEY:
     MY_IP = urllib.urlopen('http://www.whatismyip.com/automation/n09230945.asp').read()
     YOUTUBE_PATTERN = re.compile('(http://www.youtube.com[^\&]+)')
     
-    @alias('g')
-    @register
+    @command('g')
     def google(self, nick, host, channel, *args):
         """despite its name, this actually googles for stuff!"""
         if args:
@@ -22,8 +21,7 @@ if GOOGLE_API_KEY:
         msg = 'top result: %s - %s' % (title, url)
         return str(msg)
 
-    @alias('gb', 'books')
-    @register
+    @command('gb', 'books')
     def google_books(self, nick, host, channel, *args):
         """searches for books"""
         if args:
@@ -37,8 +35,7 @@ if GOOGLE_API_KEY:
         msg = 'top result: %s - %s' % (title, url)
         return str(msg)
 
-    @alias('gi')
-    @register
+    @command('gi', 'images')
     def google_image(self, nick, host, channel, *args):
         """searches for images"""
         if args:
@@ -52,8 +49,7 @@ if GOOGLE_API_KEY:
         msg = 'top result: %s - %s' % (title, url)
         return str(msg)
    
-    @alias('gp', 'patent')
-    @register
+    @command('gp', 'patents')
     def google_patent(self, nick, host, channel, *args):
         """searches patents"""
         if args:
@@ -67,8 +63,7 @@ if GOOGLE_API_KEY:
         msg = 'top result: %s - %s' % (title, url)
         return str(msg)
 
-    @alias('gv', 'youtube', 'yt')
-    @register
+    @command('gv', 'youtube', 'yt')
     def google_video(self, nick, host, channel, *args):
         """searches for videos"""
         if args:
@@ -86,8 +81,7 @@ if GOOGLE_API_KEY:
         msg = 'top result: %s - %s' % (title, url)
         return str(msg)
 
-    @alias('gt', 'translate')
-    @register
+    @command('gt', 'translate')
     def google_translate(self, nick, host, channel, language_pair=None, *args):
         """so kawaii"""
         if not args or not language_pair:

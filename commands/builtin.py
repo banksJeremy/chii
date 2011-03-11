@@ -1,16 +1,15 @@
-from chii import register, admin
+from chii import command
 
-@admin
+@command(restrict='admin')
 def rehash(self, nick, host, *args):
     """u don't know me"""
     self.update_registry(self.chii.cmd_path)
     return '\002rehash !!\002 rehashed'
 
-@register
+@command
 def help(self, nick, host, channel, command=None, *args):
     """returns help nogga"""
-    available_help = self.registry.keys()
-    if '!'.join((nick, host)) not in self.chii.admins:
+    if '!'.join((nick, host)) not in config['admins']:
         available_help = filter(lambda x: not self.registry[x]._admin_only, available_help)
 
     if command in available_help:
@@ -21,22 +20,22 @@ def help(self, nick, host, channel, command=None, *args):
         return '\002help ??\002 eh wut'
     return '\002help ?? available commands\002 >> %s' % ', '.join(sorted(available_help))
 
-@register
+@command
 def say(self, nick, host, channel, *args):
     """SAY SMTH ELSE"""
     self.chii.msg(channel, ' '.join(args))
 
-@register
+@command
 def me(self, nick, host, channel, *args):
     """strike a pose"""
     self.chii.me(channel, ' '.join(args))
 
-@register
+@command
 def topic(self, nick, host, channel, *args):
     """how 2 make babby"""
     self.chii.topic(channel, ' '.join(args))
 
-@admin
+@command(restrict='admin')
 def mode(self, nick, host, channel, *args):
     """change the game"""
     new_mode = 'MODE %s' % ' '.join(args)

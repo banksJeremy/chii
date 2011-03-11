@@ -1,47 +1,89 @@
 #!/usr/bin/env python
 
+import argparse, new, os, sys, time, traceback
 from twisted.words.protocols import irc
-from twisted.internet import reactor, protocol
+from twisted.internet import reactor, protocol, defer
 from twisted.python import log
-
-import new, os, sys, time
 import yaml
 
-config_file = 'bot.config'
+CONFIG_FILE = 'bot.config'
 
-if os.path.isfile(config_file):
-    with open(config_file) as f:
+EVENT_TYPES = (
+    'msg',
+    'privmsg',
+    'pubmsg',
+    'join',
+    'kick',
+)
+
+USER_LEVELS = (
+    'admin',
+)
+
+config = {}
+if os.path.isfile(CONFIG_FILE):
+    with open(CONFIG_FILE) as f:
         config = yaml.load(f.read())
-else:
-    print 'Missing configuration file!'
-    sys.exit(0)
 
-def register(f):
-    """Decorator that marks a function as a bot command"""
-    f._registered = True
-    f._registered_name = f.__name__
-    f._admin_only = False
-    return f
+def command(*args, **kwargs):
+    """Decorator which adds callable to command registry"""
+    if args and not hasattr(args[0], '__call__') or kwargs:
+        def decorator(func):
+            def wrapper(*func_args, **func_kwargs):
+                return func(*func_args, **func_kwargs)
+            wrapper._registry = 'commands'
+            wrapper.__name__ = func.__name__
+            wrapper.__doc__ = func.__doc__
+            if args:
+                wrapper._command_names = (func.__name__,) + args
+            else:
+                wrapper._command_names = (func.__name__,)
+            if 'restrict' in kwargs:
+                wrapper._restrict = kwargs['restrict']
+            else:
+                wrapper._restrict = None
+            return wrapper
+        return decorator
+    else:
+        func = args[0]
+        def wrapper(*func_args, **func_kwargs):
+            return func(*func_args, **func_kwargs)
+        wrapper._registry = 'commands'
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        wrapper._command_names = (func.__name__,)
+        if 'restrict' in kwargs:
+            wrapper._restrict = kwargs['restrict']
+        else:
+            wrapper._restrict = None
+        return wrapper
 
-def alias(*args):
-    """Decorator that assigns a list of aliases to a botcommand"""
-    def decorator(f):
-        f._aliases = list(args)
-        return f
+def event(event_type):
+    """Decorator which adds callable to the event registry"""
+    def decorator(func):
+        def wrapper(*func_args, **func_kwargs):
+            return func(*func_innerargs, **func_kwargs)
+        if event_type in EVENT_TYPES:
+            wrapper._registry = 'events'
+            wrapper._event_type = event_type
+            wrapper.__name__ = func.__name__
+            wrapper.__doc__ = func.__doc__
+        return wrapper
     return decorator
 
-def admin(f):
-    def wrapper(self, nick, host, *args):
-        if '!'.join((nick, host)) in self.chii.admins:
-            return f(self, nick, host, *args)
-        else:
-            return '\002denied !!\002 shit, cat'
-    wrapper.__doc__ = f.__doc__
-    wrapper._registered = True
-    wrapper._registered_name = f.__name__
-    wrapper._admin_only = True
-    return wrapper
+def task(*args):
+    """Decorator which adds callable to task registry"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        wrapper._registry = 'tasks'
+        wrapper._task_interval = args[0]
+        return wrapper
+    return decorator
 
+    
 class Logger:
     """A simple logger class"""
     def __init__(self):
@@ -59,31 +101,48 @@ class Logger:
 
 class Registry:
     """A class that tracks modules for command, etc"""
+
     def __init__(self, chii):
         self.chii = chii
-        self.registry = {}
+        self.commands = {}
+        self.events = {k: None for k in (EVENT_TYPES)}
+        self.tasks = []
+        self._initialized = False
 
-    def add_to_registry(self, method):
-        names = [method._registered_name]
-        if hasattr(method, '_aliases'):
-            names = names + method._aliases
-        for name in names:
-            if name in self.registry:
-                print 'Warning! Registry already contains %s' % name    
-            self.registry[name] = new.instancemethod(method, self, Registry)
+    def update_registry(self, paths):
+        def add_to_registry(package, modules):
+            def add_command(method):
+                for name in method._command_names:
+                    if name in self.commands:
+                        print 'Warning! commands registry already contains %s' % name
+                    self.commands[name] = new.instancemethod(method, self, Registry)
+                    print '[command] %s' % name
+        
+            def add_event(method):
+                if method._event_type in EVENT_TYPES:
+                    self.events[method._event_type] = new.instancemethod(method, self, Registry)
+                    print '[event - %s] %s ' % (method._event_type, method.__name__)
+        
+            def add_task(method):
+                self.tasks.append(new.instancemethod(method, self, Registry))
+                print '[task - %s] %s' % (method._task_interval, method.__name__)
 
-    def update_registry(self, path):
-        def add_methods(package, modules):
-            sys.path.append(os.path.dirname(path))
+            def error(method):
+                print 'Eh, wut?'
+
+            dispatch = {'commands': add_command, 'events': add_event, 'tasks': add_task}
+
             for module in modules:
                 try:
+                    print 'Importing', module
                     mod = __import__('%s.%s' % (package, module), globals(), locals(), [module], -1)
                 except Exception as e:
-                    print 'Error importing %s: %s' % (module, e)
+                    print 'Error importing %s', module
+                    traceback.print_exc()
                     break
-                registered = filter(lambda x: hasattr(x, '_registered'), (getattr(mod, x) for x in dir(mod) if not x.startswith('_')))
+                registered = filter(lambda x: hasattr(x, '_registry'), (getattr(mod, x) for x in dir(mod) if not x.startswith('_')))
                 for method in registered:
-                    self.add_to_registry(method)
+                    dispatch.get(method._registry, error)(method)
 
         def reload_modules(package, modules):
             pkg = __import__(package)
@@ -94,15 +153,18 @@ class Registry:
                         delattr(mod, attr)
                     reload(sys.modules['%s.%s' % (package, module)])
 
-        path = os.path.abspath(path)
-        package = os.path.split(path)[-1]
-        modules = [f.replace('.py', '') for f in os.listdir(path) if f.endswith('.py') and f != '__init__.py']
-        # check if we're already loaded
-        if self.registry:
-            self.registry = {}
-            reload_modules(package, modules)
-        add_methods(package, modules)
-        print 'Registering: %s' % ' '.join(sorted(self.registry.keys()))
+        for path in paths:
+            print 'Looking in %s for registered callables...' % path
+            path = os.path.abspath(path)
+            package = os.path.split(path)[-1]
+            modules = [f.replace('.py', '') for f in os.listdir(path) if f.endswith('.py') and f != '__init__.py']
+            # check if we're already loaded
+            if self._initialized:
+                reload_modules(package, modules)
+            else:
+                self._initialized = True
+            add_to_registry(package, modules)
+
 
 class Chii(irc.IRCClient):
     """An IRC Bot."""
@@ -115,7 +177,7 @@ class Chii(irc.IRCClient):
     logging = config.get('logging', True)
     admins = config.get('admins', None)
     cmd_prefix = config.get('cmd_prefix', '.')
-    cmd_path = config.get('cmd_path', 'modules/commands')
+    module_paths = config.get('module_paths', 'modules')
     logger = Logger()
 
     def connectionMade(self):
@@ -123,8 +185,8 @@ class Chii(irc.IRCClient):
 
         # setup bot
         self.logger.log("[connected at %s]" % time.asctime(time.localtime(time.time())))
-        self.commands = Registry(self)
-        self.commands.update_registry(self.cmd_path)
+        self.registry = Registry(self)
+        self.registry.update_registry(self.module_paths)
 
     def connectionLost(self, reason):
         irc.IRCClient.connectionLost(self, reason)
@@ -160,11 +222,12 @@ class Chii(irc.IRCClient):
             command, args = msg[0][1:], []
             if len(msg) > 1:
                 args = msg[1:]
-            if self.commands.registry.get(command, None):
+            if self.registry.commands.get(command, None):
                 try:
-                    response = self.commands.registry[command](nick, host, channel, *args)
+                    response = self.registry.commands[command](nick, host, channel, *args)
                 except Exception as e:
                     response = 'ur shit am fuked! %s' % e
+                    traceback.print_exc()
                 if response:
                     self.msg(channel, response)
                     self.logger.log("<%s> %s" % (self.nickname, response))
@@ -196,11 +259,9 @@ class Chii(irc.IRCClient):
         """
         if self.identpass:
             self.msg('nickserv', 'ghost %s %s' % (self.nickname, self.identpass))
-            reactor.callLater(4, self.setNick(self.nickname))
+            self.setNick(self.nickname)
         else:
             self.setNick(alterCollidedNick(self._attemptedNick))
-
-
 
 class ChiiFactory(protocol.ClientFactory):
     """A factory for ChiiBots.

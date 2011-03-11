@@ -1,5 +1,5 @@
 import json, random, urllib, urllib2
-from chii import alias, config, register
+from chii import config, command
 
 IMGUR_API_KEY = config.get('imgur_api_key', None)
 
@@ -7,7 +7,7 @@ def get_random(items):
     index = int(random.random() * len(items))
     return items[index]
 
-@register
+@command
 def face(self, nick, host, channel, *args):
     """you need help with your face?"""
     if args:
@@ -19,12 +19,12 @@ def face(self, nick, host, channel, *args):
         return "hahah %s's face" % name
     return 'hahah your face'
 
-@register
+@command
 def sheen(self, nick, host, channel, *args):
     """well why not"""
     return 'I GOT TIGER BLOOD IN ME %s' % nick.upper()
 
-@register
+@command
 def haha(self, nick, host, channel, *args):
     """sometimes i get giggly"""
     laughter = [
@@ -45,7 +45,7 @@ def haha(self, nick, host, channel, *args):
         haha = ''.join([get_random(laughter) for laugh in args])
     return haha
 
-@register
+@command
 def bonghits(self, nick, host, channel, *args):
     """what? huh? sorry i'm a little high"""
     interjections = ['\002cough\002', '...', 'hehe', '    mmm', 'hahah',
@@ -59,7 +59,7 @@ def bonghits(self, nick, host, channel, *args):
             speech.append(get_random(interjections))
     return ' '.join(speech)
 
-@register
+@command
 def directions(self, nick, host, channel, *args):
     """try from -> to, now get lost"""
     url = 'http://www.mapquest.com/?le=t&q1=%s&q2=%s&maptype=map&vs=directions'
@@ -70,7 +70,7 @@ def directions(self, nick, host, channel, *args):
 
 
 if IMGUR_API_KEY:
-    @register
+    @command
     def imgur(self, nick, host, channel, *args):
         """<densy> this mode is full of fail"""
         url = 'http://api.imgur.com/2/stats.json'
