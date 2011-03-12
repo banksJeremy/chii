@@ -66,7 +66,7 @@ def event(event_type):
     """Decorator which adds callable to the event registry"""
     def decorator(func):
         def wrapper(*func_args, **func_kwargs):
-            return func(*func_innerargs, **func_kwargs)
+            return func(*func_args, **func_kwargs)
         if event_type in EVENT_TYPES:
             wrapper._registry = 'events'
             wrapper._event_type = event_type
@@ -78,8 +78,8 @@ def event(event_type):
 def task(*args):
     """Decorator which adds callable to task registry"""
     def decorator(func):
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
+        def wrapper(*func_args, **func_kwargs):
+            return func(*func_args, **func_kwargs)
         wrapper.__name__ = func.__name__
         wrapper.__doc__ = func.__doc__
         wrapper._registry = 'tasks'
@@ -109,7 +109,7 @@ class Registry:
     def __init__(self, chii):
         self.chii = chii
         self.commands = {}
-        self.events = {k: None for k in (EVENT_TYPES)}
+        self.events = {k: [] for k in (EVENT_TYPES)}
         self.tasks = []
         self._initialized = False
 
@@ -124,7 +124,7 @@ class Registry:
         
             def add_event(method):
                 if method._event_type in EVENT_TYPES:
-                    self.events[method._event_type] = new.instancemethod(method, self, Registry)
+                    self.events[method._event_type].append(new.instancemethod(method, self, Registry))
                     print '[event - %s] %s ' % (method._event_type, method.__name__)
         
             def add_task(method):
@@ -211,14 +211,33 @@ class Chii(irc.IRCClient):
         """This will get called when the bot joins the channel."""
         self.logger.log("[I have joined %s]" % channel)
 
+
+    def _handle_event(self, event_type, channel, *args, **kwargs):
+        """Handles event and catches errors, returns result of event as bot message"""
+        for func in self.registry.events[event_type]:
+            try:
+                response = func(channel, *args, **kwargs)
+            except Exception as e:
+                    response = 'ur shit am fuked! %s' % e
+                    traceback.print_exc()
+            if response:
+                self.msg(channel, response)
+                self.logger.log("<%s> %s" % (self.nickname, response))
+
     def privmsg(self, user, channel, msg):
         """This will get called when the bot receives a message."""
         nick, host = user.split('!')
         self.logger.log("<%s> %s" % (nick, msg))
-        
-        # Check to see if they're sending me a private message
+
+        # catch-all msg event
+        self._handle_event('msg', channel, nick, host, msg)
+
         if channel == self.nickname:
-            pass
+            # this is a message from a user
+            self._handle_event('privmsg', channel, nick, host, msg)
+        else:
+            # this is a message in the channel
+            self._handle_event('pubmsg', channel, nick, host, msg)
 
         # Check if we're getting a command
         if msg.startswith(self.cmd_prefix):

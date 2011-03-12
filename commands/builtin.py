@@ -1,4 +1,4 @@
-from chii import command
+from chii import command, config
 
 @command(restrict='admin')
 def rehash(self, nick, host, *args):
@@ -9,8 +9,8 @@ def rehash(self, nick, host, *args):
 @command
 def help(self, nick, host, channel, command=None, *args):
     """returns help nogga"""
-    if '!'.join((nick, host)) not in config['admins']:
-        available_help = filter(lambda x: not self.registry[x]._admin_only, available_help)
+    if '!'.join((nick, host)) not in config['user_role']['admins']:
+        available_help = filter(lambda x: not self.commands[x]._admin_only, available_help)
 
     if command in available_help:
         method = self.registry[command]

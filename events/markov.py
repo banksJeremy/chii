@@ -1,64 +1,75 @@
-import os
-from collections import defaultdict
-
 from chii import config, event
 
 BRAIN = config.get('markov_brain', None)
+CHATTINESS = 0
+WORD_COUNT = 10
 
 if BRAIN:
-    markov = defaultdict(list)
-    STOP_WORD = "\n"
-    
-    def add_to_brain(msg, chain_length, write_to_file=False):
-        if write_to_file:
-            f = open(BRAIN, 'a')
-            f.write(msg + '\n')
-            f.close()
-        buf = [STOP_WORD] * chain_length
-        for word in msg.split():
-            markov[tuple(buf)].append(word)
-            del buf[0]
-            buf.append(word)
-        markov[tuple(buf)].append(STOP_WORD)
-    
-    def generate_sentence(msg, chain_length, max_words=10000):
-        buf = msg.split()[:chain_length]
-        if len(msg.split()) > chain_length:
-            message = buf[:]
-        else:
-            message = []
-            for i in xrange(chain_length):
-                message.append(random.choice(markov[random.choice(markov.keys())]))
-        for i in xrange(max_words):
-            try:
-                next_word = random.choice(markov[tuple(buf)])
-            except IndexError:
-                continue
-            if next_word == STOP_WORD:
-                break
-            message.append(next_word)
-            del buf[0]
-            buf.append(next_word)
-        return ' '.join(message)
-    
-    @event('privmsg')
-    def markov(self, user, channel, msg):
-        if self.nickname in msg:
-            msg = re.compile(self.nickname + "[:,]* ?", re.I).sub('', msg)
-            prefix = "%s: " % (user.split('!', 1)[0], )
+    import random, re, os
+    from collections import defaultdict
+
+    class MarkovChain:
+        chain = defaultdict(list)
+        word_max = 30
+
+        def add_to_brain(self, line, write_to_file=False):
+            if write_to_file:
+                with open(BRAIN, 'a') as f:
+                    f.write(line + '\n')
+            w1 = w2 = "\n"
+            for word in line.split():
+                self.chain[(w1, w2)].append(word)
+                w1, w2 = w2, word
+            self.chain[w1, w2].append('\n')
+
+        def get_key(self, msg=None):
+            if msg and len(msg.split()) > 1:
+                words = msg.split()
+                w1, w2 = words[0:2]
+                for word in words:
+                    if self.chain[(w1, w2)] != []:
+                        return w1, w2
+                    w1, w2 = w2, word
+            return random.choice(self.chain.keys())
+
+        def generate_sentence(self, msg):
+            sentence = ''
+            w1, w2 = self.get_key(msg)
+            for i in xrange(self.word_max):
+                try:
+                    word = random.choice(self.chain[(w1, w2)])
+                except IndexError:
+                    word = random.choice(self.chain[self.get_key()])
+                word = word.strip()
+                if not word:
+                    break
+                sentence = ' '.join((sentence, word))
+                w1, w2 = w2, word
+            if len(sentence) < 10:
+                return self.generate(None)
+            return self.clean(sentence)
+
+        def clean(self, sentence):
+            sentence = sentence.replace('"', '')
+            return sentence
+
+    @event('msg')
+    def markov(self, channel, nick, host, msg):
+        if self.chii.nickname in msg:
+            msg = re.compile(self.chii.nickname + "[:,]* ?", re.I).sub('', msg)
+            prefix = "%s:" % nick
         else:
             prefix = ''
-        add_to_brain(msg, self.factory.chain_length, write_to_file=True)
-        if prefix or random.random() <= self.factory.chattiness:
-            sentence = generate_sentence(msg, self.factory.chain_length,
-                self.factory.max_words)
-            if sentence:
-                self.msg(self.factory.channel, prefix + sentence)
+
+        if prefix or random.random() <= CHATTINESS:
+            return prefix + markov_chain.generate_sentence(msg)
+
+        markov_chain.add_to_brain(msg, write_to_file=True)
+
+    markov_chain = MarkovChain()
 
     if os.path.exists(BRAIN):
-        f = open(BRAIN, 'r')
-        for line in f:
-            add_to_brain(line, chain_length)
+        with open(BRAIN) as f:
+            for line in f:
+                markov_chain.add_to_brain(line)
         print 'Brain Reloaded'
-        f.close()
-    
