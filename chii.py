@@ -105,7 +105,6 @@ class Logger:
 
 class Registry:
     """A class that tracks modules for command, etc"""
-
     def __init__(self, chii):
         self.chii = chii
         self.commands = {}
@@ -170,9 +169,39 @@ class Registry:
             add_to_registry(package, modules)
 
 
-class Chii(irc.IRCClient):
-    """An IRC Bot."""
+class Chii:
+    """Class that handles all the chii specific functionality"""
+    def _handle_command(self, channel, nick, host, msg):
+        """Handles commands, passing them proper args, etc"""
+        msg = msg.split()
+        command, args = msg[0][1:], []
+        if len(msg) > 1:
+            args = msg[1:]
+        if self.registry.commands.get(command, None):
+            try:
+                response = self.registry.commands[command](nick, host, channel, *args)
+            except Exception as e:
+                response = 'ur shit am fuked! %s' % e
+                traceback.print_exc()
+            if response:
+                self.msg(channel, response)
+                self.logger.log("<%s> %s" % (self.nickname, response))
 
+
+    def _handle_event(self, event_type, channel, *args, **kwargs):
+        """Handles event and catches errors, returns result of event as bot message"""
+        for func in self.registry.events[event_type]:
+            try:
+                response = func(channel, *args, **kwargs)
+            except Exception as e:
+                    response = 'ur shit am fuked! %s' % e
+                    traceback.print_exc()
+            if response:
+                self.msg(channel, response)
+                self.logger.log("<%s> %s" % (self.nickname, response))
+
+
+class ChiiBot(irc.IRCClient, Chii):
     # setup sensible defaults
     channels = config.get('channels', ['chiisadventure'])
     nickname = config.get('nickname', 'chii')
@@ -212,18 +241,6 @@ class Chii(irc.IRCClient):
         self.logger.log("[I have joined %s]" % channel)
 
 
-    def _handle_event(self, event_type, channel, *args, **kwargs):
-        """Handles event and catches errors, returns result of event as bot message"""
-        for func in self.registry.events[event_type]:
-            try:
-                response = func(channel, *args, **kwargs)
-            except Exception as e:
-                    response = 'ur shit am fuked! %s' % e
-                    traceback.print_exc()
-            if response:
-                self.msg(channel, response)
-                self.logger.log("<%s> %s" % (self.nickname, response))
-
     def privmsg(self, user, channel, msg):
         """This will get called when the bot receives a message."""
         nick, host = user.split('!')
@@ -241,19 +258,7 @@ class Chii(irc.IRCClient):
 
         # Check if we're getting a command
         if msg.startswith(self.cmd_prefix):
-            msg = msg.split()
-            command, args = msg[0][1:], []
-            if len(msg) > 1:
-                args = msg[1:]
-            if self.registry.commands.get(command, None):
-                try:
-                    response = self.registry.commands[command](nick, host, channel, *args)
-                except Exception as e:
-                    response = 'ur shit am fuked! %s' % e
-                    traceback.print_exc()
-                if response:
-                    self.msg(channel, response)
-                    self.logger.log("<%s> %s" % (self.nickname, response))
+            self._handle_command(channel, nick, host, msg)
 
     def action(self, user, channel, msg):
         """This will get called when the bot sees someone do an action."""
@@ -293,7 +298,7 @@ class ChiiFactory(protocol.ClientFactory):
     """
 
     # the class of the protocol to build when new connection is made
-    protocol = Chii
+    protocol = ChiiBot
 
     def __init__(self, config):
         self.config = config
@@ -305,7 +310,6 @@ class ChiiFactory(protocol.ClientFactory):
     def clientConnectionFailed(self, connector, reason):
         print "connection failed:", reason
         reactor.stop()
-
 
 if __name__ == '__main__':
     # initialize logging
