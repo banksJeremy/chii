@@ -1,4 +1,4 @@
-from chii import command, config
+from chii import check_permission, command, config
 
 @command(restrict='admins')
 def rehash(self, nick, host, *args):
@@ -9,11 +9,9 @@ def rehash(self, nick, host, *args):
 @command
 def help(self, nick, host, channel, command=None, *args):
     """returns help nogga"""
-    roles = config.get('user_roles', None)
-
     commands = filter(lambda x: self.commands[x]._restrict is None, self.commands)
-    for role in roles:
-        if '!'.join((nick, host)) in role:
+    for role in config.get('user_roles'):
+        if check_permission(role, nick, host):
             commands.extend(filter(lambda x: self.commands[x]._restrict == role, self.commands))
 
     if command in commands:

@@ -83,6 +83,14 @@ def task(*args):
         return wrapper
     return decorator
 
+def check_permission(restrict_to, nick, host):
+    if restrict_to is None:
+        return True
+    for member in (nick, host, '!'.join((nick, host))):
+        if member in config['user_roles'][restrict_to]:
+            return True
+    return False
+
     
 class Logger:
     """A simple logger class"""
@@ -170,14 +178,6 @@ class Chii:
     """Class that handles all the chii specific functionality"""
     def _handle_command(self, channel, nick, host, msg):
         """Handles commands, passing them proper args, etc"""
-        def check_permission(restrict_to, nick, host):
-            if restrict_to is None:
-                return True
-            for member in (nick, host, '!'.join((nick, host))):
-                if member in config['user_roles'][restrict_to]:
-                    return True
-            return False
-        
         msg = msg.split()
         command, args = msg[0][1:], []
         command = self.registry.commands.get(command, None)
