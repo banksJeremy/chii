@@ -46,7 +46,7 @@ if BRAIN:
                 sentence = ' '.join((sentence, word))
                 w1, w2 = w2, word
             if len(sentence) < 10:
-                return self.generate(None)
+                return self.generate_sentence(None)
             return self.clean(sentence)
 
         def clean(self, sentence):
