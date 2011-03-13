@@ -16,10 +16,6 @@ EVENT_TYPES = (
     'kick',
 )
 
-USER_LEVELS = (
-    'admin',
-)
-
 config = {}
 if os.path.isfile(CONFIG_FILE):
     with open(CONFIG_FILE) as f:
@@ -156,36 +152,47 @@ class Registry:
                         delattr(mod, attr)
                     reload(sys.modules['%s.%s' % (package, module)])
 
-        for path in paths:
-            print 'Looking in %s for registered callables...' % path
-            path = os.path.abspath(path)
-            package = os.path.split(path)[-1]
-            modules = [f.replace('.py', '') for f in os.listdir(path) if f.endswith('.py') and f != '__init__.py']
-            # check if we're already loaded
-            if self._initialized:
-                reload_modules(package, modules)
-            else:
-                self._initialized = True
-            add_to_registry(package, modules)
+        if paths:
+            for path in paths:
+                print 'Looking in %s for registered callables...' % path
+                path = os.path.abspath(path)
+                package = os.path.split(path)[-1]
+                modules = [f.replace('.py', '') for f in os.listdir(path) if f.endswith('.py') and f != '__init__.py']
+                # check if we're already loaded
+                if self._initialized:
+                    reload_modules(package, modules)
+                else:
+                    self._initialized = True
+                add_to_registry(package, modules)
 
 
 class Chii:
     """Class that handles all the chii specific functionality"""
     def _handle_command(self, channel, nick, host, msg):
         """Handles commands, passing them proper args, etc"""
+        def check_permission(restrict_to, nick, host):
+            if restrict_to is None:
+                return True
+            for member in (nick, host, '!'.join((nick, host))):
+                if member in config['user_roles'][restrict_to]:
+                    return True
+            return False
+        
         msg = msg.split()
         command, args = msg[0][1:], []
-        if len(msg) > 1:
-            args = msg[1:]
-        if self.registry.commands.get(command, None):
-            try:
-                response = self.registry.commands[command](nick, host, channel, *args)
-            except Exception as e:
-                response = 'ur shit am fuked! %s' % e
-                traceback.print_exc()
-            if response:
-                self.msg(channel, response)
-                self.logger.log("<%s> %s" % (self.nickname, response))
+        command = self.registry.commands.get(command, None)
+        if command:
+            if check_permission(command._restrict, nick, host):
+                if len(msg) > 1:
+                    args = msg[1:]
+                try:
+                    response = command(nick, host, channel, *args)
+                except Exception as e:
+                    response = 'ur shit am fuked! %s' % e
+                    traceback.print_exc()
+                if response:
+                    self.msg(channel, response)
+                    self.logger.log("<%s> %s" % (self.nickname, response))
 
 
     def _handle_event(self, event_type, channel, *args, **kwargs):
@@ -210,7 +217,6 @@ class ChiiBot(irc.IRCClient, Chii):
     logging = config.get('logging', True)
     admins = config.get('admins', None)
     cmd_prefix = config.get('cmd_prefix', '.')
-    module_paths = config.get('module_paths', 'modules')
     logger = Logger()
 
     def connectionMade(self):
@@ -219,7 +225,7 @@ class ChiiBot(irc.IRCClient, Chii):
         # setup bot
         self.logger.log("[connected at %s]" % time.asctime(time.localtime(time.time())))
         self.registry = Registry(self)
-        self.registry.update_registry(self.module_paths)
+        self.registry.update_registry(config.get('modules', None))
 
     def connectionLost(self, reason):
         irc.IRCClient.connectionLost(self, reason)

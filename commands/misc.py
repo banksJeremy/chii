@@ -25,6 +25,11 @@ def sheen(self, nick, host, channel, *args):
     return 'I GOT TIGER BLOOD IN ME %s' % nick.upper()
 
 @command
+def halp(self, nick, host, channel, *args):
+    """bunny said ^"""
+    return 'halp halp halp!'
+
+@command
 def haha(self, nick, host, channel, *args):
     """sometimes i get giggly"""
     laughter = [
