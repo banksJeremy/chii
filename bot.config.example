@@ -1,21 +1,29 @@
 nickname: chii
 realname: chii
+identpass: yaya
 
 server: irc.esper.net
 port: 6697
 ssl: true
 
 channels:
-- chiisadventure
+  - chiisadventure
 
-admins:
-- you!your@host
+user_roles:
+    admins:
+      - nick!ident@host
 
 logging: true
 logfile: logs/chii.log
 
 cmd_prefix: .
-cmd_path: commands
 
-imgur_api_key: none
-google_api_key: none
+modules:
+  - commands
+  - events
+  - tasks
+
+imgur_api_key: YOUR_API_KEY
+google_api_key: YOUR_API_KEY
+
+markov_brain: brain.txt
