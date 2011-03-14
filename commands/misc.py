@@ -1,4 +1,4 @@
-import json, random, urllib, urllib2
+import json, random, os, urllib, urllib2
 from chii import config, command
 
 IMGUR_API_KEY = config.get('imgur_api_key', None)
@@ -23,6 +23,24 @@ def face(self, nick, host, channel, *args):
 def sheen(self, nick, host, channel, *args):
     """well why not"""
     return 'I GOT TIGER BLOOD IN ME %s' % nick.upper()
+
+@command
+def last(self, nick, host, channel, *args):
+    """that last bit was quite funny!"""
+    def get_line(f, size):
+        while True:
+            size -= 1
+            f.seek(size)
+            line = f.read()
+            if line.startswith('\n'):
+                return f, size, line
+
+    log = self.chii.config['logfile']
+    size = os.path.getsize(log) - 2 # skip last \n hopefully
+    with open(log) as f:
+        last = get_line(f, size) # find last line
+        line = get_line(last[0], last[1])[2].split('\n')[1].split(']', 1)[1] # get line before and clean it up!
+    self.chii.topic(channel, line.strip())
 
 @command
 def halp(self, nick, host, channel, *args):

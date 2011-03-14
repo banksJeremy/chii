@@ -3,6 +3,8 @@ from chii import config, event
 BRAIN = config.get('markov_brain', None)
 CHATTINESS = 0
 WORD_COUNT = 10
+WORD_MAX = 1000
+SENTENCE_SEPS = ('. ', '! ', '? ', '\n')
 
 if BRAIN:
     import random, re, os
@@ -10,14 +12,13 @@ if BRAIN:
 
     class MarkovChain:
         chain = defaultdict(list)
-        word_max = 30
 
         def add_to_brain(self, line, write_to_file=False):
             if write_to_file:
                 with open(BRAIN, 'a') as f:
                     f.write(line + '\n')
             w1 = w2 = "\n"
-            for word in line.split():
+            for word in line.split(' '):
                 self.chain[(w1, w2)].append(word)
                 w1, w2 = w2, word
             self.chain[w1, w2].append('\n')
@@ -35,7 +36,7 @@ if BRAIN:
         def generate_sentence(self, msg):
             sentence = ''
             w1, w2 = self.get_key(msg)
-            for i in xrange(self.word_max):
+            for i in xrange(WORD_MAX):
                 try:
                     word = random.choice(self.chain[(w1, w2)])
                 except IndexError:
@@ -45,29 +46,28 @@ if BRAIN:
                     break
                 sentence = ' '.join((sentence, word))
                 w1, w2 = w2, word
-            if len(sentence) < 10:
+            if len(sentence) < 20:
                 return self.generate_sentence(None)
-            return self.clean(sentence)
+            return sentence
 
-        def clean(self, sentence):
+    @event('msg')
+    def markov(self, nick, host, channel, msg):
+        def clean_sentence(sentence):
             sentence = sentence.replace('"', '')
             if sentence[-1] in (',', ';'):
                 sentence = sentence[:-1]
             if sentence[-1] not in ('!', '.', '?'):
                 sentence += '.'
-            sentence = sentence[0].upper() + sentence[1:]
-            return sentence
+            return sentence.upper()
 
-    @event('msg')
-    def markov(self, nick, host, channel, msg):
-        if self.chii.nickname in msg:
+        if self.chii.nickname.lower() in msg.lower():
             msg = re.compile(self.chii.nickname + "[:,]* ?", re.I).sub('', msg)
             prefix = "%s:" % nick
         else:
             prefix = ''
 
         if prefix or random.random() <= CHATTINESS:
-            return prefix + markov_chain.generate_sentence(msg)
+            return prefix + clean_sentence(markov_chain.generate_sentence(msg))
 
         markov_chain.add_to_brain(msg, write_to_file=True)
 
@@ -75,6 +75,6 @@ if BRAIN:
 
     if os.path.exists(BRAIN):
         with open(BRAIN) as f:
-            for line in f:
+            for line in f.readlines():
                 markov_chain.add_to_brain(line)
         print 'Brain Reloaded'
