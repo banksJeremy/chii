@@ -25,6 +25,11 @@ def sheen(self, nick, host, channel, *args):
     return 'I GOT TIGER BLOOD IN ME %s' % nick.upper()
 
 @command
+def pat(self, nick, host, channel, *args):
+    """because i am a good bot!"""
+    self.chii.me(channel, 'leg twitches, and looks at you happily')
+
+@command
 def last(self, nick, host, channel, *args):
     """that last bit was quite funny!"""
     def get_line(f, size):
