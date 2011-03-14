@@ -168,7 +168,7 @@ class Registry:
 
 class Chii:
     """Class that handles all the chii specific functionality"""
-    def _handle_command(self, channel, nick, host, msg):
+    def _handle_command(self, nick, host, channel, msg):
         """Handles commands, passing them proper args, etc"""
         msg = msg.split()
         command, args = msg[0][1:], []
@@ -190,22 +190,24 @@ class Chii:
                     self.logger.log("<%s> %s" % (self.nickname, response))
 
 
-    def _handle_event(self, event_type, channel, *args, **kwargs):
+    def _handle_event(self, event_type=None, respond=False, *args):
         """Handles event and catches errors, returns result of event as bot message"""
         events = self.registry.events.get(event_type, None)
         if events:
-            for event in self.registry.events[event_type]:
+            for event in events:
                 try:
-                    response = event(channel, *args, **kwargs)
+                    response = event(*args)
                 except Exception as e:
-                        response = 'ur shit am fuked! %s' % e
-                        traceback.print_exc()
-                if response:
-                    self.msg(channel, response)
+                    response = 'ur shit am fuked! %s' % e
+                    traceback.print_exc()
+                if respond and response:
+                    # only return something if this event is caught in a channel
+                    self.msg(respond, response)
                     self.logger.log("<%s> %s" % (self.nickname, response))
 
 
 class ChiiBot(irc.IRCClient, Chii):
+    config = config
     channels = config.get('channels', ['chiisadventure'])
     nickname = config.get('nickname', 'chii')
     realname = config.get('realname', 'chii')
@@ -246,19 +248,16 @@ class ChiiBot(irc.IRCClient, Chii):
         nick, host = user.split('!')
         self.logger.log("<%s> %s" % (nick, msg))
 
-        # catch-all msg event
-        self._handle_event('msg', channel, nick, host, msg)
-
+        # handle message events
+        self._handle_event('msg', channel, nick, host, channel, msg)
         if channel == self.nickname:
-            # this is a message from a user
-            self._handle_event('privmsg', channel, nick, host, msg)
+            self._handle_event('pubmsg', channel, nick, host, channel, msg)
         else:
-            # this is a message in the channel
-            self._handle_event('pubmsg', channel, nick, host, msg)
+            self._handle_event('pubmsg', channel, nick, host, channel, msg)
 
         # Check if we're getting a command
         if msg.startswith(self.cmd_prefix):
-            self._handle_command(channel, nick, host, msg)
+            self._handle_command(nick, host, channel, msg)
 
     def action(self, user, channel, msg):
         """This will get called when the bot sees someone do an action."""
