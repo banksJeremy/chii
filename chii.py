@@ -5,21 +5,16 @@ from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol, defer
 from twisted.python import log
 import yaml
+from collections import defaultdict
 
 CONFIG_FILE = 'bot.config'
 
-EVENT_TYPES = (
-    'msg',
-    'privmsg',
-    'pubmsg',
-    'join',
-    'kick',
-)
-
-config = {}
+# get config OR DIE TRYING
 if os.path.isfile(CONFIG_FILE):
     with open(CONFIG_FILE) as f:
         config = yaml.load(f.read())
+else:
+    print 'Config file missing! Create', CONFIG_FILE
 
 def command(*args, **kwargs):
     """Decorator which adds callable to command registry"""
@@ -63,11 +58,10 @@ def event(event_type):
     def decorator(func):
         def wrapper(*func_args, **func_kwargs):
             return func(*func_args, **func_kwargs)
-        if event_type in EVENT_TYPES:
-            wrapper._registry = 'events'
-            wrapper._event_type = event_type
-            wrapper.__name__ = func.__name__
-            wrapper.__doc__ = func.__doc__
+        wrapper._registry = 'events'
+        wrapper._event_type = event_type
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
         return wrapper
     return decorator
 
@@ -111,68 +105,66 @@ class Registry:
     """A class that tracks modules for command, etc"""
     def __init__(self, chii):
         self.chii = chii
-        self.commands = {}
-        self.events = {k: [] for k in (EVENT_TYPES)}
-        self.tasks = []
-        self._initialized = False
 
     def update_registry(self, paths):
-        def add_to_registry(package, modules):
+        """Updates command, event task registries"""
+        def import_module(package, module):
+            """imports, reloading if neccessary given package.module"""
+            path = '%s.%s' % (package, module)
+
+            # cleanup if we're reloading
+            if path in sys.modules:
+                print 'Reloading', path
+                mod = sys.modules[path]
+                for attr in filter(lambda x: x != '__name__', dir(mod)):
+                    delattr(mod, attr)
+                reload(mod)
+            else:
+                print 'Importing', path
+
+            # try to import module
+            try:
+                mod = __import__(path, globals(), locals(), [module], -1)
+                return mod
+            except Exception as e:
+                print 'Error importing %s: %s' % (path, e)
+                traceback.print_exc()
+
+        def add_to_registry(mod):
+            """Adds registred methods to registry"""
             def add_command(method):
                 for name in method._command_names:
                     if name in self.commands:
                         print 'Warning! commands registry already contains %s' % name
                     self.commands[name] = new.instancemethod(method, self, Registry)
-                    print '[command] %s' % name
         
             def add_event(method):
-                if method._event_type in EVENT_TYPES:
-                    self.events[method._event_type].append(new.instancemethod(method, self, Registry))
-                    print '[event - %s] %s ' % (method._event_type, method.__name__)
+                self.events[method._event_type].append(new.instancemethod(method, self, Registry))
         
             def add_task(method):
                 self.tasks.append(new.instancemethod(method, self, Registry))
-                print '[task - %s] %s' % (method._task_interval, method.__name__)
-
-            def error(method):
-                print 'Eh, wut?'
 
             dispatch = {'commands': add_command, 'events': add_event, 'tasks': add_task}
 
-            for module in modules:
-                try:
-                    print 'Importing', module
-                    mod = __import__('%s.%s' % (package, module), globals(), locals(), [module], -1)
-                except Exception as e:
-                    print 'Error importing %s', module
-                    traceback.print_exc()
-                    break
-                registered = filter(lambda x: hasattr(x, '_registry'), (getattr(mod, x) for x in dir(mod) if not x.startswith('_')))
-                for method in registered:
-                    dispatch.get(method._registry, error)(method)
-
-        def reload_modules(package, modules):
-            pkg = __import__(package)
-            for module in modules:
-                if hasattr(pkg, module):
-                    mod = getattr(pkg, module)
-                    for attr in [x for x in dir(mod) if not x.startswith('_')]:
-                        delattr(mod, attr)
-                    reload(sys.modules['%s.%s' % (package, module)])
+            registered = filter(lambda x: hasattr(x, '_registry'), (getattr(mod, x) for x in dir(mod) if not x.startswith('_')))
+            for method in registered:
+                dispatch.get(method._registry)(method)
 
         if paths:
+            self.commands = {}
+            self.events = defaultdict(list)
+            self.tasks = []
             for path in paths:
-                print 'Looking in %s for registered callables...' % path
                 path = os.path.abspath(path)
                 package = os.path.split(path)[-1]
                 modules = [f.replace('.py', '') for f in os.listdir(path) if f.endswith('.py') and f != '__init__.py']
-                # check if we're already loaded
-                if self._initialized:
-                    reload_modules(package, modules)
-                else:
-                    self._initialized = True
-                add_to_registry(package, modules)
-
+                for module in modules:
+                    mod = import_module(package, module)
+                    if mod:
+                        add_to_registry(mod)
+            print '[commands]', ', '.join(sorted(x for x in self.commands))
+            print '[events]', ': '.join(sorted(x + ': ' + ', '.join(sorted(y.__name__ for y in self.events[x])) for x in self.events))
+            print '[tasks]', ', '.join(sorted(x for x in self.tasks))
 
 class Chii:
     """Class that handles all the chii specific functionality"""
@@ -191,31 +183,33 @@ class Chii:
                     response = 'ur shit am fuked! %s' % e
                     traceback.print_exc()
                 if response:
-                    self.msg(channel, response)
+                    if channel == self.nickname:
+                        self.msg(nick, response)
+                    else:
+                        self.msg(channel, response)
                     self.logger.log("<%s> %s" % (self.nickname, response))
 
 
     def _handle_event(self, event_type, channel, *args, **kwargs):
         """Handles event and catches errors, returns result of event as bot message"""
-        for func in self.registry.events[event_type]:
-            try:
-                response = func(channel, *args, **kwargs)
-            except Exception as e:
-                    response = 'ur shit am fuked! %s' % e
-                    traceback.print_exc()
-            if response:
-                self.msg(channel, response)
-                self.logger.log("<%s> %s" % (self.nickname, response))
+        events = self.registry.events.get(event_type, None)
+        if events:
+            for event in self.registry.events[event_type]:
+                try:
+                    response = event(channel, *args, **kwargs)
+                except Exception as e:
+                        response = 'ur shit am fuked! %s' % e
+                        traceback.print_exc()
+                if response:
+                    self.msg(channel, response)
+                    self.logger.log("<%s> %s" % (self.nickname, response))
 
 
 class ChiiBot(irc.IRCClient, Chii):
-    # setup sensible defaults
     channels = config.get('channels', ['chiisadventure'])
     nickname = config.get('nickname', 'chii')
     realname = config.get('realname', 'chii')
     identpass = config.get('identpass', None)
-    logging = config.get('logging', True)
-    admins = config.get('admins', None)
     cmd_prefix = config.get('cmd_prefix', '.')
     logger = Logger()
 

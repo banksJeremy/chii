@@ -21,7 +21,7 @@ def get_random(items):
 
 @event('msg')
 def haha(self, channel, nick, host, msg):
-    if random.random() > .8:
+    if random.random() < 0.99:
         if 'haha' in msg.lower():
             haha = ''
             for i in range(int(random.random()*10)):
