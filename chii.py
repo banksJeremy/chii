@@ -171,7 +171,7 @@ class Chii:
     def _handle_command(self, nick, host, channel, msg):
         """Handles commands, passing them proper args, etc"""
         msg = msg.split()
-        command, args = msg[0][1:], []
+        command, args = msg[0][1:].lower(), []
         command = self.registry.commands.get(command, None)
         if command:
             if check_permission(command._restrict, nick, host):

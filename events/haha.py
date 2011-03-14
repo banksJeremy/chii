@@ -30,7 +30,7 @@ if config.has_key('haha_threshold'):
                 return haha
 
     @command
-    def haha_threshold(self, nick, host, channel, threshold=None):
+    def hat(self, nick, host, channel, threshold=None):
         """set's threshold for random laughter. must be a float between 0.01 and 0.99"""
         if threshold:
             try:

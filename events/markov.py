@@ -51,10 +51,15 @@ if BRAIN:
 
         def clean(self, sentence):
             sentence = sentence.replace('"', '')
+            if sentence[-1] in (',', ';'):
+                sentence = sentence[:-1]
+            if sentence[-1] not in ('!', '.', '?'):
+                sentence += '.'
+            sentence = sentence[0].upper() + sentence[1:]
             return sentence
 
     @event('msg')
-    def markov(self, channel, nick, host, msg):
+    def markov(self, nick, host, channel, msg):
         if self.chii.nickname in msg:
             msg = re.compile(self.chii.nickname + "[:,]* ?", re.I).sub('', msg)
             prefix = "%s:" % nick
