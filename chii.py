@@ -27,7 +27,7 @@ def command(*args, **kwargs):
             wrapper.__name__ = func.__name__
             wrapper.__doc__ = func.__doc__
             if args:
-                wrapper._command_names = (func.__name__,) + args
+                wrapper._command_names = args
             else:
                 # used with keyword arg but not alias names!
                 wrapper._command_names = (func.__name__,)
@@ -90,6 +90,12 @@ class Logger:
     """A simple logger class"""
     def __init__(self):
         self.file = open(config['logfile'], 'a')
+
+    def log_action(self, user, msg):
+        self.log("* %s %s" % (user, msg))
+
+    def log_msg(self, nickn, msg):
+        self.log("<%s> %s" % (nick, msg))
 
     def log(self, message):
         """Write a message to the file."""
@@ -261,8 +267,9 @@ class ChiiBot(irc.IRCClient, Chii):
 
     def action(self, user, channel, msg):
         """This will get called when the bot sees someone do an action."""
-        user = user.split('!', 1)[0]
-        self.logger.log("* %s %s" % (user, msg))
+        nick, host = user.split('!')
+        self._handle_event('action', channel, nick, host, channel, msg)
+        self.logger.log("* %s %s" % (nick, msg))
 
     # irc callbacks
 

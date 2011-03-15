@@ -22,12 +22,24 @@ def face(self, nick, host, channel, *args):
 @command
 def sheen(self, nick, host, channel, *args):
     """well why not"""
-    return 'I GOT TIGER BLOOD IN ME %s' % nick.upper()
+    return '\002I GOT TIGER BLOOD IN ME %s' % nick.upper()
+
+@command
+def neoblaze(self, nick, host, channel, *args):
+    """well why not"""
+    for i in range( int(random.random()*5) ):
+        self.chii.msg(channel, 'np: Pendulum - Propane Nightmares (5:13)')
+    for i in range( int(random.random()*10) ):
+        self.chii.msg(channel, 'DUDU'*int(random.random()*20))
 
 @command
 def pat(self, nick, host, channel, *args):
     """because i am a good bot!"""
-    self.chii.me(channel, 'leg twitches, and looks at you happily')
+    if host.endswith('vf.shawcable.net'):
+        pats = 'pat ' * int(random.random()*5)
+        self.chii.me(channel, pats + nick)
+    else:
+        self.chii.me(channel, 'leg twitches, and looks at you happily')
 
 @command
 def last(self, nick, host, channel, *args):
@@ -87,6 +99,9 @@ def bonghits(self, nick, host, channel, *args):
             speech.append(get_random(interjections))
     return ' '.join(speech)
 
+
+
+
 @command
 def directions(self, nick, host, channel, *args):
     """try from -> to, now get lost"""
@@ -107,3 +122,20 @@ if IMGUR_API_KEY:
         results = json.load(response)['stats']['most_popular_images']
         result = get_random(results)
         return 'densy recommended. doctor approved: http://imgur.com/%s' % str(result)
+
+@command('lambda')
+def lambda_command(self, nick, host, channel, *args):
+    """.lambda <command_name>: <anonymous function body> (note: passed nick, host, channel, *args)"""
+    # handle new lambda function creation
+    if not len(args) > 1 or not args[0].endswith(':'):
+        return 'check the help yo'
+
+    cmd_name, args = args[0][:-1], args[1:]
+    if cmd_name in self.commands:
+        return 'sorry command by that name already exists'
+
+    command = eval(' '.join(('lambda nick, host, channel, *args:',) + args))
+    command.__doc__ = "f = lambda nick, host, channel, *args: " + ' '.join(args)
+    command._restrict = None
+    self.commands[cmd_name] = command
+    return 'added new lambda function to commands as %s' % cmd_name

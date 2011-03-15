@@ -7,7 +7,7 @@ if GOOGLE_API_KEY:
     MY_IP = urllib.urlopen('http://www.whatismyip.com/automation/n09230945.asp').read()
     YOUTUBE_PATTERN = re.compile('(http://www.youtube.com[^\&]+)')
     
-    @command('g')
+    @command('g', 'google')
     def google(self, nick, host, channel, *args):
         """despite its name, this actually googles for stuff!"""
         if args:
@@ -63,7 +63,7 @@ if GOOGLE_API_KEY:
         msg = 'top result: %s - %s' % (title, url)
         return str(msg)
 
-    @command('gv', 'youtube', 'yt')
+    @command('youtube', 'yt')
     def google_video(self, nick, host, channel, *args):
         """searches for videos"""
         if args:
