@@ -132,9 +132,12 @@ def lambda_command(self, nick, host, channel, *args):
 
     cmd_name, args = args[0][:-1], args[1:]
     if cmd_name in self.commands:
-        return 'sorry command by that name already exists'
-
-    command = eval(' '.join(('lambda nick, host, channel, *args:',) + args))
+        if hasattr(self.commands[cmd_name], '_registry'):
+            return "lambda commands can't override normal commands"
+    try:
+        command = eval(' '.join(('lambda nick, host, channel, *args:',) + args))
+    except Exception as e:
+        return 'not a valid lambda function: %s' % e
     command.__doc__ = "f = lambda nick, host, channel, *args: " + ' '.join(args)
     command._restrict = None
     self.commands[cmd_name] = command
