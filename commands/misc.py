@@ -138,7 +138,7 @@ def lambda_command(self, nick, host, channel, *args):
         command = eval(' '.join(('lambda nick, host, channel, *args:',) + args))
     except Exception as e:
         return 'not a valid lambda function: %s' % e
-    command.__doc__ = "f = lambda nick, host, channel, *args: " + ' '.join(args)
+    command.__doc__ = "lambda function added by \002%s\002. lambda nick, host, channel, *args: \002%s" % (nick, ' '.join(args))
     command._restrict = None
     self.commands[cmd_name] = command
     return 'added new lambda function to commands as %s' % cmd_name
