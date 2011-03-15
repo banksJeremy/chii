@@ -25,6 +25,7 @@ class ChiiConfig(dict):
         'channels': ['chiisadventure'],
         'cmd_prefix': '.',
         'modules': ['commands', 'events', 'tasks'],
+        'owner': 'zk!is@whatit.is',
         'user_roles': {'admins': ['zk!is@whatit.is']},
     }
     def __init__(self, file):
@@ -260,6 +261,7 @@ class ChiiBot(irc.IRCClient, ChiiEventHandler, ChiiRegistry):
         irc.IRCClient.connectionMade(self)
         self.logger.log("[connected at %s]" % time.asctime(time.localtime(time.time())))
         self._update_registry()
+        self._handle_event('load', False)
 
     def connectionLost(self, reason):
         irc.IRCClient.connectionLost(self, reason)

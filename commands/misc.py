@@ -33,6 +33,18 @@ def neoblaze(self, nick, host, channel, *args):
         self.msg(channel, 'DUDU'*int(random.random()*20))
 
 @command
+def lambchops(self, nick, host, channel, *args):
+    """THIS IS THE..."""
+    SONG_THAT_NEVER_ENDS = [
+        "THIS IS THE SONG THAT DOESN'T END",
+        "YES IT GOES ON AND ON MY FRIEND",
+        "SOME PEOPLE STARTED SINGING IT NOT KNOWING WHAT IT WAS",
+        "AND THEY'LL CONTINUE SINGING IT FOREVER JUST BECAUSE"
+    ]
+    for line in SONG_THAT_NEVER_ENDS:
+        self.msg(channel, line)
+
+@command
 def pat(self, nick, host, channel, *args):
     """because i am a good bot!"""
     if host.endswith('vf.shawcable.net'):
