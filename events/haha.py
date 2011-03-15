@@ -1,6 +1,8 @@
 from chii import command, config, event
 
-if config.has_key('haha_threshold'):
+THRESHOLD = config['haha_threshold']
+
+if THRESHOLD:
     import random
 
     LAUGHTER = (
@@ -22,7 +24,7 @@ if config.has_key('haha_threshold'):
 
     @event('msg')
     def haha(self, nick, host, channel, msg):
-        if random.random() < self.chii.config['haha_threshold']:
+        if random.random() < self.config['haha_threshold']:
             if 'haha' in msg.lower():
                 haha = ''
                 for i in range(int(random.random()*10)):
@@ -38,9 +40,9 @@ if config.has_key('haha_threshold'):
             except ValueError:
                 return 'hey man use a fucking float!'
             if 0 <= threshold <= 1:
-                self.chii.config['haha_threshold'] = threshold
+                self.config['haha_threshold'] = threshold
                 return 'laughter threshold set to %s' % threshold
             else:
                 return 'yeah fuck you'
         else:
-           return 'laughter threshold set to %s' % self.chii.config['haha_threshold']
+           return 'laughter threshold set to %s' % self.config['haha_threshold']

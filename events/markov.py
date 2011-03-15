@@ -1,6 +1,6 @@
 from chii import config, event
 
-BRAIN = config.get('markov_brain', None)
+BRAIN = config['markov_brain']
 CHATTINESS = 0
 WORD_COUNT = 10
 WORD_MAX = 1000
@@ -60,8 +60,8 @@ if BRAIN:
                 sentence += '.'
             return sentence.upper()
 
-        if self.chii.nickname.lower() in msg.lower():
-            msg = re.compile(self.chii.nickname + "[:,]* ?", re.I).sub('', msg)
+        if self.nickname.lower() in msg.lower():
+            msg = re.compile(self.nickname + "[:,]* ?", re.I).sub('', msg)
             prefix = "%s:" % nick
         else:
             prefix = ''

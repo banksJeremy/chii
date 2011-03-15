@@ -1,21 +1,54 @@
 #!/usr/bin/env python
-
 import argparse, new, os, sys, time, traceback
+from collections import defaultdict
+
 from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol, defer
 from twisted.python import log
+
 import yaml
-from collections import defaultdict
 
-CONFIG_FILE = 'bot.config'
+### config ###
+CONFIG_FILE = 'chii.config'
 
-# get config OR DIE TRYING
-if os.path.isfile(CONFIG_FILE):
-    with open(CONFIG_FILE) as f:
-        config = yaml.load(f.read())
-else:
-    print 'Config file missing! Create', CONFIG_FILE
+class ChiiConfig(dict):
+    """Handles all configuration for chii. Reads/writes from/to YAML.
+       Acts like a normal dict, except returns default value or None
+       for non-existant keys."""
 
+    defaults = {
+        'nickname': 'chii',
+        'realname': 'chii',
+        'server': 'irc.esper.net',
+        'port': 6697,
+        'ssl': True,
+        'channels': ['chiisadventure'],
+        'cmd_prefix': '.',
+        'modules': ['commands', 'events', 'tasks'],
+        'user_roles': {'admins': ['zk!is@whatit.is']},
+    }
+    def __init__(self, file):
+        self.file = file
+        if os.path.isfile(file):
+            with open(file) as f:
+                config = yaml.load(f.read())
+                for k in config:
+                    self.__setitem__(k, config[k])
+
+    def __getitem__(self, key):
+        if self.__contains__(key):
+            return super(ChiiConfig, self).__getitem__(key)
+        elif key in self.defaults:
+            return self.defaults[key]
+
+    def save(self):
+        with open(self.file, 'w') as f:
+            f.write(yaml.dump(dict(self), default_flow_style=False))
+
+# get config
+config = ChiiConfig(CONFIG_FILE)
+
+### decorators ###
 def command(*args, **kwargs):
     """Decorator which adds callable to command registry"""
     if args and not hasattr(args[0], '__call__') or kwargs:
@@ -37,7 +70,6 @@ def command(*args, **kwargs):
                 wrapper._restrict = None
             return wrapper
         return decorator
-    
     else:
         # used without any args
         func = args[0]
@@ -77,6 +109,7 @@ def task(*args):
         return wrapper
     return decorator
 
+### utitlity functions ###
 def check_permission(restrict_to, nick, host):
     if restrict_to is None:
         return True
@@ -85,11 +118,18 @@ def check_permission(restrict_to, nick, host):
             return True
     return False
 
-    
-class Logger:
-    """A simple logger class"""
-    def __init__(self):
-        self.file = open(config['logfile'], 'a')
+### application logic ###
+class ChiiLogger:
+    """Logs both irc events and chii events into different log files"""
+    def __init__(self, irc_log, chii_log):
+        if irc_log:
+            self.irc_log = open(irc_log, 'a')
+        else:
+            # do not log
+            self.log = self.close = lambda *args: None
+        if chii_log:
+            observer = log.FileLogObserver(open(chii_log, 'a'))
+            observer.start()
 
     def log_action(self, user, msg):
         self.log("* %s %s" % (user, msg))
@@ -100,62 +140,59 @@ class Logger:
     def log(self, message):
         """Write a message to the file."""
         timestamp = time.strftime("[%H:%M:%S]", time.localtime(time.time()))
-        self.file.write('%s %s\n' % (timestamp, message))
-        self.file.flush()
+        self.irc_log.write('%s %s\n' % (timestamp, message))
+        self.irc_log.flush()
 
     def close(self):
-        self.file.close()
+        self.irc_log.close()
 
-
-class Registry:
+class ChiiRegistry:
     """A class that tracks modules for command, etc"""
-    def __init__(self, chii):
-        self.chii = chii
+    def _add_to_registry(self, mod):
+        """Adds registred methods to registry"""
+        def add_command(method):
+            for name in method._command_names:
+                if name in self.commands:
+                    print 'Warning! commands registry already contains %s' % name
+                self.commands[name] = new.instancemethod(method, self, ChiiRegistry)
+    
+        def add_event(method):
+            self.events[method._event_type].append(new.instancemethod(method, self, ChiiRegistry))
+    
+        def add_task(method):
+            self.tasks.append(new.instancemethod(method, self, ChiiRegistry))
 
-    def update_registry(self, paths):
+        dispatch = {'commands': add_command, 'events': add_event, 'tasks': add_task}
+
+        registered = filter(lambda x: hasattr(x, '_registry'), (getattr(mod, x) for x in dir(mod) if not x.startswith('_')))
+        for method in registered:
+            dispatch.get(method._registry)(method)
+
+    def _import_module(self, package, module):
+        """imports, reloading if neccessary given package.module"""
+        path = '%s.%s' % (package, module)
+
+        # cleanup if we're reloading
+        if path in sys.modules:
+            print 'Reloading', path
+            mod = sys.modules[path]
+            for attr in filter(lambda x: x != '__name__', dir(mod)):
+                delattr(mod, attr)
+            reload(mod)
+        else:
+            print 'Importing', path
+
+        # try to import module
+        try:
+            mod = __import__(path, globals(), locals(), [module], -1)
+            return mod
+        except Exception as e:
+            print 'Error importing %s: %s' % (path, e)
+            traceback.print_exc()
+
+    def _update_registry(self):
         """Updates command, event task registries"""
-        def import_module(package, module):
-            """imports, reloading if neccessary given package.module"""
-            path = '%s.%s' % (package, module)
-
-            # cleanup if we're reloading
-            if path in sys.modules:
-                print 'Reloading', path
-                mod = sys.modules[path]
-                for attr in filter(lambda x: x != '__name__', dir(mod)):
-                    delattr(mod, attr)
-                reload(mod)
-            else:
-                print 'Importing', path
-
-            # try to import module
-            try:
-                mod = __import__(path, globals(), locals(), [module], -1)
-                return mod
-            except Exception as e:
-                print 'Error importing %s: %s' % (path, e)
-                traceback.print_exc()
-
-        def add_to_registry(mod):
-            """Adds registred methods to registry"""
-            def add_command(method):
-                for name in method._command_names:
-                    if name in self.commands:
-                        print 'Warning! commands registry already contains %s' % name
-                    self.commands[name] = new.instancemethod(method, self, Registry)
-        
-            def add_event(method):
-                self.events[method._event_type].append(new.instancemethod(method, self, Registry))
-        
-            def add_task(method):
-                self.tasks.append(new.instancemethod(method, self, Registry))
-
-            dispatch = {'commands': add_command, 'events': add_event, 'tasks': add_task}
-
-            registered = filter(lambda x: hasattr(x, '_registry'), (getattr(mod, x) for x in dir(mod) if not x.startswith('_')))
-            for method in registered:
-                dispatch.get(method._registry)(method)
-
+        paths = self.config['modules']
         if paths:
             self.commands = {}
             self.events = defaultdict(list)
@@ -165,20 +202,20 @@ class Registry:
                 package = os.path.split(path)[-1]
                 modules = [f.replace('.py', '') for f in os.listdir(path) if f.endswith('.py') and f != '__init__.py']
                 for module in modules:
-                    mod = import_module(package, module)
+                    mod = self._import_module(package, module)
                     if mod:
-                        add_to_registry(mod)
+                        self._add_to_registry(mod)
             print '[commands]', ', '.join(sorted(x for x in self.commands))
             print '[events]', ': '.join(sorted(x + ': ' + ', '.join(sorted(y.__name__ for y in self.events[x])) for x in self.events))
             print '[tasks]', ', '.join(sorted(x for x in self.tasks))
 
-class Chii:
-    """Class that handles all the chii specific functionality"""
+class ChiiEventHandler:
+    """Handles events, commands"""
     def _handle_command(self, nick, host, channel, msg):
         """Handles commands, passing them proper args, etc"""
         msg = msg.split()
         command, args = msg[0][1:].lower(), []
-        command = self.registry.commands.get(command, None)
+        command = self.commands.get(command, None)
         if command:
             if check_permission(command._restrict, nick, host):
                 if len(msg) > 1:
@@ -198,7 +235,7 @@ class Chii:
 
     def _handle_event(self, event_type=None, respond=False, *args):
         """Handles event and catches errors, returns result of event as bot message"""
-        events = self.registry.events.get(event_type, None)
+        events = self.events.get(event_type, None)
         if events:
             for event in events:
                 try:
@@ -211,43 +248,34 @@ class Chii:
                     self.msg(respond, response)
                     self.logger.log("<%s> %s" % (self.nickname, response))
 
-
-class ChiiBot(irc.IRCClient, Chii):
+### twisted protocol/factory ###
+class ChiiBot(irc.IRCClient, ChiiEventHandler, ChiiRegistry):
     config = config
-    channels = config.get('channels', ['chiisadventure'])
-    nickname = config.get('nickname', 'chii')
-    realname = config.get('realname', 'chii')
-    identpass = config.get('identpass', None)
-    cmd_prefix = config.get('cmd_prefix', '.')
-    logger = Logger()
+    logger = ChiiLogger(config['irc_log'], config['chii_log'])
+    nickname = config['nickname']
+    realname = config['realname']
 
     def connectionMade(self):
         irc.IRCClient.connectionMade(self)
-
-        # setup bot
         self.logger.log("[connected at %s]" % time.asctime(time.localtime(time.time())))
-        self.registry = Registry(self)
-        self.registry.update_registry(config.get('modules', None))
+        self._update_registry()
 
     def connectionLost(self, reason):
         irc.IRCClient.connectionLost(self, reason)
         self.logger.log("[disconnected at %s]" % time.asctime(time.localtime(time.time())))
         self.logger.close()
 
-    # callbacks for events
-
     def signedOn(self):
         """Called when bot has succesfully signed on to server."""
         self.setNick(self.nickname)
-        if self.identpass:
-            self.msg('nickserv', 'identify %s' % self.identpass)
-        for channel in self.channels:
+        if self.config['identpass']:
+            self.msg('nickserv', 'identify %s' % self.config['identpass'])
+        for channel in self.config['channels']:
             self.join(channel)
 
     def joined(self, channel):
-        """This will get called when the bot joins the channel."""
+        """This will get called when the bot joins a channel."""
         self.logger.log("[I have joined %s]" % channel)
-
 
     def privmsg(self, user, channel, msg):
         """This will get called when the bot receives a message."""
@@ -262,7 +290,7 @@ class ChiiBot(irc.IRCClient, Chii):
             self._handle_event('pubmsg', channel, nick, host, channel, msg)
 
         # Check if we're getting a command
-        if msg.startswith(self.cmd_prefix):
+        if msg.startswith(self.config['cmd_prefix']):
             self._handle_command(nick, host, channel, msg)
 
     def action(self, user, channel, msg):
@@ -271,8 +299,23 @@ class ChiiBot(irc.IRCClient, Chii):
         self._handle_event('action', channel, nick, host, channel, msg)
         self.logger.log("* %s %s" % (nick, msg))
 
-    # irc callbacks
+    def userJoined(self, user, channel):
+        """Called when I see another user joining a channel."""
+        pass
 
+    def userLeft(self, user, channel):
+        """Called when I see another user leaving a channel."""
+        pass
+
+    def userQuit(self, user, quitMessage):
+        """Called when I see another user disconnect from the network."""
+        pass
+
+    def userKicked(self, kickee, channel, kicker, message):
+        """Called when I observe someone else being kicked from a channel."""
+        pass
+
+    # irc callbacks
     def irc_NICK(self, prefix, params):
         """Called when an IRC user changes their nickname."""
         old_nick = prefix.split('!')[0]
@@ -291,23 +334,15 @@ class ChiiBot(irc.IRCClient, Chii):
         Called when we try to register or change to a nickname that is already
         taken.
         """
-        if self.identpass:
-            self.msg('nickserv', 'ghost %s %s' % (self.nickname, self.identpass))
+        if self.config['identpass']:
+            self.msg('nickserv', 'ghost %s %s' % (self.nickname, self.config['identpass']))
             self.setNick(self.nickname)
         else:
             self.setNick(alterCollidedNick(self._attemptedNick))
 
 class ChiiFactory(protocol.ClientFactory):
-    """A factory for ChiiBots.
-
-    A new protocol instance will be created each time we connect to the server.
-    """
-
-    # the class of the protocol to build when new connection is made
+    """A factory for ChiiBots."""
     protocol = ChiiBot
-
-    def __init__(self, config):
-        self.config = config
 
     def clientConnectionLost(self, connector, reason):
         """If we get disconnected, reconnect to server."""
@@ -317,15 +352,21 @@ class ChiiFactory(protocol.ClientFactory):
         print "connection failed:", reason
         reactor.stop()
 
+### main ###
 if __name__ == '__main__':
+    # no config? DIE
+    if not config:
+        print 'No config file found! Create', CONFIG_FILE
+        sys.exit(1)
+
     # initialize logging
     log.startLogging(sys.stdout)
     
     # create factory protocol and application
-    factory = ChiiFactory(config)
+    factory = ChiiFactory()
 
     # connect factory to this host and port
-    if config['ssl'] is True:
+    if config['ssl']:
         from twisted.internet import ssl
         contextFactory = ssl.ClientContextFactory()
         reactor.connectSSL(config['server'], config['port'], factory, contextFactory)

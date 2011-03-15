@@ -1,7 +1,7 @@
 import json, random, os, urllib, urllib2
 from chii import config, command
 
-IMGUR_API_KEY = config.get('imgur_api_key', None)
+IMGUR_API_KEY = config['imgur_api_key']
 
 def get_random(items):
     index = int(random.random() * len(items))
@@ -28,18 +28,18 @@ def sheen(self, nick, host, channel, *args):
 def neoblaze(self, nick, host, channel, *args):
     """well why not"""
     for i in range( int(random.random()*5) ):
-        self.chii.msg(channel, 'np: Pendulum - Propane Nightmares (5:13)')
+        self.msg(channel, 'np: Pendulum - Propane Nightmares (5:13)')
     for i in range( int(random.random()*10) ):
-        self.chii.msg(channel, 'DUDU'*int(random.random()*20))
+        self.msg(channel, 'DUDU'*int(random.random()*20))
 
 @command
 def pat(self, nick, host, channel, *args):
     """because i am a good bot!"""
     if host.endswith('vf.shawcable.net'):
         pats = 'pat ' * int(random.random()*5)
-        self.chii.me(channel, pats + nick)
+        self.me(channel, pats + nick)
     else:
-        self.chii.me(channel, 'leg twitches, and looks at you happily')
+        self.me(channel, 'leg twitches, and looks at you happily')
 
 @command
 def last(self, nick, host, channel, *args):
@@ -52,12 +52,15 @@ def last(self, nick, host, channel, *args):
             if line.startswith('\n'):
                 return f, size, line
 
-    log = self.chii.config['logfile']
-    size = os.path.getsize(log) - 2 # skip last \n hopefully
-    with open(log) as f:
-        last = get_line(f, size) # find last line
-        line = get_line(last[0], last[1])[2].split('\n')[1].split(']', 1)[1] # get line before and clean it up!
-    self.chii.topic(channel, line.strip())
+    log = self.config['irc_log']
+    if log:
+        size = os.path.getsize(log) - 2 # skip last \n hopefully
+        with open(log) as f:
+            last = get_line(f, size) # find last line
+            line = get_line(last[0], last[1])[2].split('\n')[1].split(']', 1)[1] # get line before and clean it up!
+        self.topic(channel, line.strip())
+    else:
+        return 'not logging, I have no fucking clue what happened 2 seconds ago'
 
 @command
 def halp(self, nick, host, channel, *args):
@@ -122,23 +125,3 @@ if IMGUR_API_KEY:
         results = json.load(response)['stats']['most_popular_images']
         result = get_random(results)
         return 'densy recommended. doctor approved: http://imgur.com/%s' % str(result)
-
-@command('lambda')
-def lambda_command(self, nick, host, channel, *args):
-    """.lambda <command_name>: <anonymous function body> (note: passed nick, host, channel, *args)"""
-    # handle new lambda function creation
-    if not len(args) > 1 or not args[0].endswith(':'):
-        return 'check the help yo'
-
-    cmd_name, args = args[0][:-1], args[1:]
-    if cmd_name in self.commands:
-        if hasattr(self.commands[cmd_name], '_registry'):
-            return "lambda commands can't override normal commands"
-    try:
-        command = eval(' '.join(('lambda nick, host, channel, *args:',) + args))
-    except Exception as e:
-        return 'not a valid lambda function: %s' % e
-    command.__doc__ = "lambda function added by \002%s\002. lambda nick, host, channel, *args: \002%s" % (nick, ' '.join(args))
-    command._restrict = None
-    self.commands[cmd_name] = command
-    return 'added new lambda function to commands as %s' % cmd_name

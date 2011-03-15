@@ -1,9 +1,9 @@
-from chii import check_permission, command, config
+from chii import check_permission, command
 
 @command(restrict='admins')
 def rehash(self, nick, host, channel, *args):
     """u don't know me"""
-    self.update_registry(config.get('modules', None))
+    self.update_registry()
     return '\002rehash !!\002 rehashed'
 
 @command('exec', restrict='admins')
@@ -39,7 +39,7 @@ def evil_eval(self, nick, host, channel, *args):
 def help(self, nick, host, channel, command=None, *args):
     """returns help nogga"""
     commands = filter(lambda x: self.commands[x]._restrict is None, self.commands)
-    for role in config.get('user_roles'):
+    for role in self.config['user_roles']:
         if check_permission(role, nick, host):
             commands.extend(filter(lambda x: self.commands[x]._restrict == role, self.commands))
 
@@ -54,23 +54,23 @@ def help(self, nick, host, channel, command=None, *args):
 @command
 def say(self, nick, host, channel, *args):
     """SAY SMTH ELSE"""
-    self.chii.msg(channel, ' '.join(args))
+    self.msg(channel, ' '.join(args))
 
 @command
 def me(self, nick, host, channel, *args):
     """strike a pose"""
-    self.chii.me(channel, ' '.join(args))
+    self.me(channel, ' '.join(args))
 
 @command
 def topic(self, nick, host, channel, *args):
     """how 2 make babby"""
-    self.chii.topic(channel, ' '.join(args))
+    self.topic(channel, ' '.join(args))
 
 @command(restrict='admins')
 def mode(self, nick, host, channel, *args):
     """change the game"""
     new_mode = 'MODE %s' % ' '.join(args)
-    self.chii.sendLine(new_mode)
+    self.sendLine(new_mode)
 
 def op(self): pass
 

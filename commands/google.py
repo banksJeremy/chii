@@ -1,7 +1,7 @@
 import json, urllib, urllib2, re
 from chii import command, config
 
-GOOGLE_API_KEY = config.get('google_api_key', None)
+GOOGLE_API_KEY = config['google_api_key']
 
 if GOOGLE_API_KEY:
     MY_IP = urllib.urlopen('http://www.whatismyip.com/automation/n09230945.asp').read()
