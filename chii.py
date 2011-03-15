@@ -42,8 +42,9 @@ class ChiiConfig(dict):
             return self.defaults[key]
 
     def save(self):
-        with open(self.file, 'w') as f:
-            f.write(yaml.dump(dict(self), default_flow_style=False))
+        f = open(self.file, 'w')
+        f.write(yaml.dump(dict(self), default_flow_style=False))
+        f.close()
 
 # get config
 config = ChiiConfig(CONFIG_FILE)

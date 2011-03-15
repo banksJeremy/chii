@@ -1,9 +1,44 @@
 from chii import check_permission, command
 
 @command(restrict='admins')
+def config(self, nick, host, channel, *args):
+    """Call without arguments to list. Call with save to save configuration. Set with key = value"""
+    def list(args):
+        config = self.config.defaults.copy()
+        config.update(self.config)
+        return ' '.join('\002%s\002: %s' % (x[0], str(x[1])) for x in config.iteritems())
+
+    def set(args):
+        if args[1] != '=':
+            return error()
+        k, v = args[0], ' '.join(args[2:])
+        # try to convert value to proper type
+        try:
+            v = eval(v)
+        except:
+            pass
+        self.config[k] = v       
+        return 'set %s to %s' % (k, str(v))
+
+    def save(args):
+        self.config.save()
+        return 'Saved configuration!'
+
+    def error(args):
+        return 'dong it rong'
+
+    dispatch = {
+        (lambda x: len(x) is 0)(args): list,
+        (lambda x: x and len(x) > 2)(args): set,
+        (lambda x: x and x[0] == 'save')(args): save,
+    }.get(True, error)
+
+    return dispatch(args)
+
+@command(restrict='admins')
 def rehash(self, nick, host, channel, *args):
     """u don't know me"""
-    self.update_registry()
+    self._update_registry()
     return '\002rehash !!\002 rehashed'
 
 @command
