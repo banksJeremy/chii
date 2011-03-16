@@ -11,7 +11,7 @@ import yaml
 ### config ###
 CONFIG_FILE = 'bot.config'
 
-class ChiiConfig(dict):
+class Config(dict):
     """Handles all configuration for chii. Reads/writes from/to YAML.
        Acts like a normal dict, except returns default value or None
        for non-existant keys."""
@@ -26,7 +26,12 @@ class ChiiConfig(dict):
         'modules': ['commands', 'events', 'tasks'],
         'owner': 'zk!is@whatit.is',
         'user_roles': {'admins': ['zk!is@whatit.is']},
+        'log_dir': 'logs',
+        'log_channel': True,
+        'log_chii': False,
+        'log_stdout': True,
     }
+
     def __init__(self, file):
         self.file = file
         if os.path.isfile(file):
@@ -37,17 +42,22 @@ class ChiiConfig(dict):
 
     def __getitem__(self, key):
         if self.__contains__(key):
-            return super(ChiiConfig, self).__getitem__(key)
+            return super(Config, self).__getitem__(key)
         elif key in self.defaults:
             return self.defaults[key]
 
     def save(self):
         f = open(self.file, 'w')
-        f.write(yaml.dump(dict(self), default_flow_style=False))
+        f.write(yaml.dump(sorted(self), default_flow_style=False))
+        f.close()
+
+    def save_defaults(self):
+        f = open(self.file, 'w')
+        f.write(yaml.dump(sorted(self.defaults), default_flow_style=False))
         f.close()
 
 # get config
-config = ChiiConfig(CONFIG_FILE)
+config = Config(CONFIG_FILE)
 
 ### decorators ###
 def command(*args, **kwargs):
@@ -110,53 +120,49 @@ def task(*args):
         return wrapper
     return decorator
 
-### utitlity functions ###
-def check_permission(restrict_to, nick, host):
-    if restrict_to is None:
-        return True
-    for member in (nick, host, '!'.join((nick, host))):
-        if member in config['user_roles'][restrict_to]:
-            return True
-    return False
-
 ### application logic ###
-class ChiiLogger:
+class Logger:
     """Logs both irc events and chii events into different log files"""
-    def __init__(self, irc_log, chii_log):
-        if irc_log:
-            self.irc_log = open(irc_log, 'a')
-        else:
-            # do not log
-            self.log = self.close = lambda *args: None
-        if chii_log:
-            observer = log.FileLogObserver(open(chii_log, 'a'))
-            observer.start()
+    def __init__(self, logs_dir, channels, nickname):
+        if os.path.isdir(logs_dir):
+            if channels:
+                self.channels = dict(((channel, open(os.path.join(logs_dir, channel), 'a')) for channel in channels))
+            else:
+                self.channels = {}
+                self.log = lambda *args: None
+            if nickname:
+                self.bot_log = open(os.path.join(logs_dir, nickname), 'a')
+                self.observer = log.FileLogObserver(self.bot_log)
+                self.observer.start()
+            else:
+                self.nickname = None
 
-    def log_action(self, user, msg):
-        self.log("* %s %s" % (user, msg))
-
-    def log_msg(self, nickn, msg):
-        self.log("<%s> %s" % (nick, msg))
-
-    def log(self, message):
+    def log(self, message, channel=None):
         """Write a message to the file."""
-        timestamp = time.strftime("[%H:%M:%S]", time.localtime(time.time()))
-        self.irc_log.write('%s %s\n' % (timestamp, message))
-        self.irc_log.flush()
+        if channel:
+            logfiles = [self.channels['channel']]
+        else:
+            logfiles = self.channels.values()
+            timestamp = time.strftime("[%H:%M:%S]", time.localtime(time.time()))
+            self.f.write('%s %s\n' % (timestamp, message))
+            self.f.flush()
 
     def close(self):
-        self.irc_log.close()
+        if self.nickname:
+            self.observer.stop()
+            self.bot_log.close()
+        for channel in self.channels:
+            self.channels[channel].close()
 
-class ChiiRegistry:
-    """A class that tracks modules for command, etc"""
+class Chii:
+    """Application logic for our chiibot"""
     def _add_to_registry(self, mod):
         """Adds registred methods to registry"""
         def add_command(method):
             for name in method._command_names:
                 if name in self.commands:
                     print 'Warning! commands registry already contains %s' % name
-		if name not in self.config['disabled_commands']:
-	                self.commands[name] = new.instancemethod(method, self, ChiiRegistry)
+                self.commands[name] = new.instancemethod(method, self, ChiiRegistry)
     
         def add_event(method):
             self.events[method._event_type].append(new.instancemethod(method, self, ChiiRegistry))
@@ -211,8 +217,6 @@ class ChiiRegistry:
             print '[events]', ': '.join(sorted(x + ': ' + ', '.join(sorted(y.__name__ for y in self.events[x])) for x in self.events))
             print '[tasks]', ', '.join(sorted(x for x in self.tasks))
 
-class ChiiEventHandler:
-    """Handles events, commands"""
     def _handle_command(self, nick, host, channel, msg):
         """Handles commands, passing them proper args, etc"""
         msg = msg.split()
@@ -250,12 +254,30 @@ class ChiiEventHandler:
                     self.msg(respond, response)
                     self.logger.log("<%s> %s" % (self.nickname, response))
 
+    def check_permission(self, restrict_to, nick, host):
+        if restrict_to is None:
+            return True
+        for member in (nick, host, '!'.join((nick, host))):
+            if member in self.config['user_roles'][restrict_to]:
+                return True
+        return False
+
+
 ### twisted protocol/factory ###
-class ChiiBot(irc.IRCClient, ChiiEventHandler, ChiiRegistry):
+class ChiiBot(irc.IRCClient, Chii):
     config = config
-    logger = ChiiLogger(config['irc_log'], config['chii_log'])
     nickname = config['nickname']
     realname = config['realname']
+
+    # setup logging
+    log_args = [None, None, None]
+    if config['log_dir']:
+        log_args[0] = config['log_dir']
+        if config['log_channel']:
+            log_args[1] = config['channels']
+        if config['log_chii']:
+            log_args[2] = nickname
+    logger = Logger(*log_args)
 
     def connectionMade(self):
         irc.IRCClient.connectionMade(self)

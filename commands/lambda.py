@@ -5,7 +5,7 @@ PERSIST = config['lambda_persist']
 SAVED_LAMBDAS = config['lambdas']
 
 # block dangerous stuff:
-DANGEROUS = (eval, execfile, file, open, __import__, __file__, __builtins__, __package__, __name__, locals, vars, globals, input, raw_input)
+DANGEROUS = (execfile, file, open, __import__, __file__, __builtins__, __package__, __name__, locals, vars, globals, input, raw_input)
 for x in DANGEROUS:
     x = None
 
@@ -19,7 +19,7 @@ def build_lambda(args):
     definition = 'lambda nick, host, channel, %s: %s' % (args, body)
     return definition, name
 
-@command('lambda')
+@command('lambda', 'def')
 def lambda_command(self, nick, host, channel, *args):
     """add new functions to the bot using python lambda functions"""
     # handle new lambda function creation
