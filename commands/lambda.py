@@ -25,9 +25,11 @@ def lambda_command(self, nick, host, channel, *args):
             self.config['lambdas'] = []
         self.config['lambdas'].append([cmd_name, func, nick])
         self.config.save()
-    command.__doc__ = "lambda function added by \002%s\002. lambda nick, host, channel, *args: \002%s" % (nick, ' '.join(args))
-    command._restrict = None
-    self.commands[cmd_name] = command
+    def lambda_wrapper(*args):
+        return str(command(*args))
+    lambda_wrapper.__doc__ = "lambda function added by \002%s\002. lambda nick, host, channel, *args: \002%s" % (nick, ' '.join(args))
+    lambda_wrapper._restrict = None
+    self.commands[cmd_name] = lambda_wrapper
     return 'added new lambda function to commands as %s' % cmd_name
 
 if PERSIST and SAVED_LAMBDAS:
@@ -39,7 +41,10 @@ if PERSIST and SAVED_LAMBDAS:
                 command = eval(func)
             except Exception as e:
                 print 'not a valid lambda function: %s' % e
-            command.__doc__ = "lambda function added by \002%s\002. lambda nick, host, channel, *args: \002%s" % (nick, ' '.join(args))
-            command._restrict = None
-            self.commands[cmd_name] = command
+                return
+            def lambda_wrapper(*args):
+                return str(command(*args))
+            lambda_wrapper.__doc__ = "lambda function added by \002%s\002. lambda nick, host, channel, *args: \002%s" % (nick, ' '.join(args))
+            lambda_wrapper._restrict = None
+            self.commands[cmd_name] = lambda_wrapper
             print 'Loaded lambda function %s' % cmd_name
