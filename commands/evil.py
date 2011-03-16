@@ -5,8 +5,11 @@ import inspect
 # utilities
 @command
 def args(self, nick, host, channel, *args):
+    """prints arguments for a function/method"""
     argspec = inspect.getargspec(eval(args[0]))
-    args = ['\002%s\002: %s' % (x, getattr(argspec, x)) for x in ('args', 'varargs', 'keywords', 'defaults')]
+    args = ['\002%s\002: %s' % (x, ' '.join(getattr(argspec, x)))
+                for x in ('args', 'varargs', 'keywords', 'defaults')
+                        if getattr(argspec, x) is not None]
     for arg in args:
         self.msg(channel, arg)
 
