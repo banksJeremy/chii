@@ -38,9 +38,9 @@ if GOOGLE_API_KEY:
     def youtube_search(*args):
         """search youtube"""
         msg, url = video(*args).rsplit(' ', 1)
+        url = url.replace('%3F', '?').replace('%3D', '=')
         if 'youtube' in url:
             url = re.search(YOUTUBE_PATTERN, url).group()
-            url = url.replace('%3F', '?').replace('%3D', '=')
         return ' '.join((msg, url))
 
     @command('gt', 'translate')
