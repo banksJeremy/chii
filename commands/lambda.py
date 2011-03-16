@@ -17,7 +17,7 @@ def build_lambda(args):
     else:
         args = '*args'
     definition = 'lambda nick, host, channel, %s: %s' % (args, body)
-    return name, definition
+    return definition, name
 
 @command('lambda')
 def lambda_command(self, nick, host, channel, *args):
@@ -35,7 +35,7 @@ def lambda_command(self, nick, host, channel, *args):
     if PERSIST:
         if not SAVED_LAMBDAS:
             self.config['lambdas'] = []
-        self.config['lambdas'].append([name, definition, nick])
+        self.config['lambdas'].append([definition, name, nick])
         self.config.save()
     def lambda_wrapper(nick, host, channel, *args):
         try:
@@ -54,26 +54,25 @@ def lambda_command(self, nick, host, channel, *args):
 if PERSIST and SAVED_LAMBDAS:
     @event('load')
     def load_lambdas(self, *args):
-        for lambda_f in SAVED_LAMBDAS:
+        for (definition, name, nick) in SAVED_LAMBDAS:
             try:
-                name, definition = build_lambda(args)
                 func = eval(definition)
             except Exception as e:
                 print 'not a valid lambda function: %s' % e
                 break
             if name in self.commands:
-                if hasattr(self.commands[cmd_name], '_registry'):
+                if hasattr(self.commands[name], '_registry'):
                     print "lambda commands can't override normal commands"
                     break
-            def lambda_wrapper(*args):
-                eval_args = []
-                for arg in args:
-                    try:
-                        arg = eval(arg)
-                    except:
-                        pass
-                    eval_args.append(arg)
-                return str(func(*eval_args))
+            def lambda_wrapper(nick, host, channel, *args):
+                try:
+                    args = eval(' '.join(args))
+                except:
+                    pass
+                if type(args) is tuple:
+                    return str(func(nick, host, channel, *args))
+                else:
+                    return str(func(nick, host, channel, args))
             lambda_wrapper.__doc__ = "lambda function added by \002%s\002. %s" % (nick, definition)
             lambda_wrapper._restrict = None
             self.commands[name] = lambda_wrapper
