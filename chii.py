@@ -30,6 +30,10 @@ class Config(dict):
         'log_channels': True,
         'log_chii': False,
         'log_stdout': True,
+        'disabled_modules': [],
+        'disabled_commands': [],
+        'disabled_events': [],
+        'disabled_tasks': [],
     }
 
     def __init__(self, file):
@@ -163,13 +167,16 @@ class Chii:
             for name in method._command_names:
                 if name in self.commands:
                     print 'Warning! commands registry already contains %s' % name
-                self.commands[name] = new.instancemethod(method, self, Chii)
+                if name not in self.config['disabled_commands']:
+                    self.commands[name] = new.instancemethod(method, self, Chii)
     
         def add_event(method):
-            self.events[method._event_type].append(new.instancemethod(method, self, Chii))
+            if name not in self.config['disabled_events']:
+                self.events[method._event_type].append(new.instancemethod(method, self, Chii))
     
         def add_task(method):
-            self.tasks.append(new.instancemethod(method, self, Chii))
+            if name not in self.config['disabled_tasks']:
+                self.tasks.append(new.instancemethod(method, self, Chii))
 
         dispatch = {'commands': add_command, 'events': add_event, 'tasks': add_task}
 
@@ -211,9 +218,10 @@ class Chii:
                 package = os.path.split(path)[-1]
                 modules = [f.replace('.py', '') for f in os.listdir(path) if f.endswith('.py') and f != '__init__.py']
                 for module in modules:
-                    mod = self._import_module(package, module)
-                    if mod:
-                        self._add_to_registry(mod)
+                    if module not in config['disabled_modules']:
+                        mod = self._import_module(package, module)
+                        if mod:
+                            self._add_to_registry(mod)
             print '[commands]', ', '.join(sorted(x for x in self.commands))
             print '[events]', ': '.join(sorted(x + ': ' + ', '.join(sorted(y.__name__ for y in self.events[x])) for x in self.events))
             print '[tasks]', ', '.join(sorted(x for x in self.tasks))
@@ -380,14 +388,23 @@ class ChiiFactory(protocol.ClientFactory):
 
 ### main ###
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='simple python bot')
+    parser.add_argument('-c', '--config', metavar='config file', help='specify a non-default configuration file to use')
+    args = parser.parse_args()
+
+    if args.config:
+        # get config
+        config = Config(args.config)
+
     # no config? DIE
     if not config:
         print 'No config file found! Create', CONFIG_FILE
         sys.exit(1)
 
     # initialize logging
-    log.startLogging(sys.stdout)
-    
+    if config['log_stdout']:
+        log.startLogging(sys.stdout)
+
     # create factory protocol and application
     factory = ChiiFactory()
 

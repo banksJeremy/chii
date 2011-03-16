@@ -33,8 +33,8 @@ def lambda_command(self, nick, host, channel, *args):
             return "lambda commands can't override normal commands"
     if PERSIST:
         if not SAVED_LAMBDAS:
-            self.config['lambdas'] = []
-        self.config['lambdas'].append([definition, name, nick])
+            self.config['lambdas'] = {}
+        self.config['lambdas'][name] = (definition, nick)
         self.config.save()
     def lambda_wrapper(nick, host, channel, *args):
         try:
@@ -53,7 +53,8 @@ def lambda_command(self, nick, host, channel, *args):
 if PERSIST and SAVED_LAMBDAS:
     @event('load')
     def load_lambdas(self, *args):
-        for (definition, name, nick) in SAVED_LAMBDAS:
+        for name in SAVED_LAMBDAS:
+            definition, nick = SAVED_LAMBDAS[key]
             try:
                 func = eval(definition)
             except Exception as e:

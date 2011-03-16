@@ -25,6 +25,14 @@ def sheen(self, nick, host, channel, *args):
     return '\002I GOT TIGER BLOOD IN ME %s' % nick.upper()
 
 @command
+def neoblaze(self, nick, host, channel, *args):
+    """well why not"""
+    for i in range( int(random.random()*5) ):
+        self.msg(channel, 'np: Pendulum - Propane Nightmares (5:13)')
+    for i in range( int(random.random()*10) ):
+        self.msg(channel, 'DUDU'*int(random.random()*20))
+
+@command
 def lambchops(self, nick, host, channel, *args):
     """THIS IS THE..."""
     SONG_THAT_NEVER_ENDS = [
