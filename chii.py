@@ -143,9 +143,10 @@ class Logger:
             logfiles = [self.channels['channel']]
         else:
             logfiles = self.channels.values()
+        for file in logfiles:
             timestamp = time.strftime("[%H:%M:%S]", time.localtime(time.time()))
-            self.f.write('%s %s\n' % (timestamp, message))
-            self.f.flush()
+            file.write('%s %s\n' % (timestamp, message))
+            file.flush()
 
     def close(self):
         if self.nickname:
@@ -162,13 +163,13 @@ class Chii:
             for name in method._command_names:
                 if name in self.commands:
                     print 'Warning! commands registry already contains %s' % name
-                self.commands[name] = new.instancemethod(method, self, ChiiRegistry)
+                self.commands[name] = new.instancemethod(method, self, Chii)
     
         def add_event(method):
-            self.events[method._event_type].append(new.instancemethod(method, self, ChiiRegistry))
+            self.events[method._event_type].append(new.instancemethod(method, self, Chii))
     
         def add_task(method):
-            self.tasks.append(new.instancemethod(method, self, ChiiRegistry))
+            self.tasks.append(new.instancemethod(method, self, Chii))
 
         dispatch = {'commands': add_command, 'events': add_event, 'tasks': add_task}
 

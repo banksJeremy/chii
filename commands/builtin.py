@@ -1,4 +1,4 @@
-from chii import check_permission, command
+from chii import command
 
 @command(restrict='admins')
 def config(self, nick, host, channel, *args):
@@ -48,7 +48,7 @@ def help(self, nick, host, channel, command=None, *args):
     """returns help nogga"""
     commands = filter(lambda x: self.commands[x]._restrict is None, self.commands)
     for role in self.config['user_roles']:
-        if check_permission(role, nick, host):
+        if self.check_permission(role, nick, host):
             commands.extend(filter(lambda x: self.commands[x]._restrict == role, self.commands))
 
     if command in commands:
