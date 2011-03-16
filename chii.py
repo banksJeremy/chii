@@ -26,8 +26,8 @@ class Config(dict):
         'modules': ['commands', 'events', 'tasks'],
         'owner': 'zk!is@whatit.is',
         'user_roles': {'admins': ['zk!is@whatit.is']},
-        'log_dir': 'logs',
-        'log_channel': True,
+        'logs_dir': 'logs',
+        'log_channels': True,
         'log_chii': False,
         'log_stdout': True,
     }
@@ -126,12 +126,12 @@ class Logger:
     def __init__(self, logs_dir, channels, nickname):
         if os.path.isdir(logs_dir):
             if channels:
-                self.channels = dict(((channel, open(os.path.join(logs_dir, channel), 'a')) for channel in channels))
+                self.channels = dict(((channel, open(os.path.join(logs_dir, channel +'.log'), 'a')) for channel in channels))
             else:
                 self.channels = {}
                 self.log = lambda *args: None
             if nickname:
-                self.bot_log = open(os.path.join(logs_dir, nickname), 'a')
+                self.bot_log = open(os.path.join(logs_dir, nickname + '.log'), 'a')
                 self.observer = log.FileLogObserver(self.bot_log)
                 self.observer.start()
             else:
@@ -224,7 +224,7 @@ class Chii:
         command, args = msg[0][1:].lower(), []
         command = self.commands.get(command, None)
         if command:
-            if check_permission(command._restrict, nick, host):
+            if self.check_permission(command._restrict, nick, host):
                 if len(msg) > 1:
                     args = msg[1:]
                 try:
@@ -272,9 +272,9 @@ class ChiiBot(irc.IRCClient, Chii):
 
     # setup logging
     log_args = [None, None, None]
-    if config['log_dir']:
-        log_args[0] = config['log_dir']
-        if config['log_channel']:
+    if config['logs_dir']:
+        log_args[0] = config['logs_dir']
+        if config['log_channels']:
             log_args[1] = config['channels']
         if config['log_chii']:
             log_args[2] = nickname

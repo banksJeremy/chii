@@ -56,10 +56,10 @@ def last(self, nick, host, channel, *args):
             if line.startswith('\n'):
                 return f, size, line
 
-    log = self.config['irc_log']
-    if log:
-        size = os.path.getsize(log) - 2 # skip last \n hopefully
-        with open(log) as f:
+    if self.config['log_channels']:
+        log_file = os.path.join(self.config['logs_dir'], channel[1:] + '.log')
+        size = os.path.getsize(log_file) - 2 # skip last \n hopefully
+        with open(log_file) as f:
             last = get_line(f, size) # find last line
             line = get_line(last[0], last[1])[2].split('\n')[1].split(']', 1)[1] # get line before and clean it up!
         self.topic(channel, line.strip())
