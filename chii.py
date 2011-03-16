@@ -9,7 +9,7 @@ from twisted.python import log
 import yaml
 
 ### config ###
-CONFIG_FILE = 'chii.config'
+CONFIG_FILE = 'bot.config'
 
 class ChiiConfig(dict):
     """Handles all configuration for chii. Reads/writes from/to YAML.

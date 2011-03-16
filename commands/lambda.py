@@ -15,7 +15,7 @@ def build_lambda(args):
     if name.endswith(')'):
         name, args = name[:-1].split('(', 1)
     else:
-        args = '*args, **kwargs'
+        args = '*args'
     definition = 'lambda nick, host, channel, %s: %s' % (args, body)
     return name, definition
 
@@ -35,17 +35,17 @@ def lambda_command(self, nick, host, channel, *args):
     if PERSIST:
         if not SAVED_LAMBDAS:
             self.config['lambdas'] = []
-        self.config['lambdas'].append([name, func, nick])
+        self.config['lambdas'].append([name, definition, nick])
         self.config.save()
-    def lambda_wrapper(*args):
-        eval_args = []
-        for arg in args:
-            try:
-                arg = eval(arg)
-            except:
-                pass
-            eval_args.append(arg)
-        return str(func(*eval_args))
+    def lambda_wrapper(nick, host, channel, *args):
+        try:
+            args = eval(' '.join(args))
+        except:
+            pass
+        if type(args) is tuple:
+            return str(func(nick, host, channel, *args))
+        else:
+            return str(func(nick, host, channel, args))
     lambda_wrapper.__doc__ = "lambda function added by \002%s\002. %s" % (nick, definition)
     lambda_wrapper._restrict = None
     self.commands[name] = lambda_wrapper
