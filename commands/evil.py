@@ -3,7 +3,7 @@ from chii import command
 import inspect
 
 # utilities
-@command
+@command(restrict='admins')
 def args(self, nick, host, channel, *args):
     """prints arguments for a function/method"""
     argspec = inspect.getargspec(eval(args[0]))

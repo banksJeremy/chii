@@ -24,13 +24,12 @@ def lambda_command(self, nick, host, channel, *args):
     """add new functions to the bot using python lambda functions"""
     # handle new lambda function creation
     try:
-        name, definition = build_lambda(args)
-        print definition
+        definition, name = build_lambda(args)
         func = eval(definition)
     except Exception as e:
         return 'not a valid lambda function: %s' % e
     if name in self.commands:
-        if hasattr(self.commands[cmd_name], '_registry'):
+        if hasattr(self.commands[name], '_registry'):
             return "lambda commands can't override normal commands"
     if PERSIST:
         if not SAVED_LAMBDAS:
