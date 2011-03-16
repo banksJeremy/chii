@@ -9,7 +9,7 @@ from twisted.python import log
 import yaml
 
 ### config ###
-CONFIG_FILE = 'bot.config'
+CONFIG_FILE = 'chii.config'
 
 class ChiiConfig(dict):
     """Handles all configuration for chii. Reads/writes from/to YAML.
@@ -341,7 +341,7 @@ class ChiiBot(irc.IRCClient, ChiiEventHandler, ChiiRegistry):
             self.msg('nickserv', 'ghost %s %s' % (self.nickname, self.config['identpass']))
             self.setNick(self.nickname)
         else:
-            self.setNick(alterCollidedNick(self._attemptedNick))
+            self.setNick(self.alterCollidedNick(self._attemptedNick))
 
 class ChiiFactory(protocol.ClientFactory):
     """A factory for ChiiBots."""

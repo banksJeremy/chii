@@ -27,8 +27,9 @@ def config(self, nick, host, channel, *args):
     def error(args):
         return 'dong it rong'
 
+    # do not try this at home kids
     dispatch = {
-        (lambda x: len(x) is 0)(args): list,
+        (lambda x: not x)(args): list,
         (lambda x: x and len(x) > 2)(args): set,
         (lambda x: x and x[0] == 'save')(args): save,
     }.get(True, error)

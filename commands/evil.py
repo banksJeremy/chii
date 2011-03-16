@@ -1,5 +1,19 @@
 from chii import check_permission, command
 
+import inspect
+
+# utilities
+def get_args(func):
+    argspec = inspect.getargspec(fun)
+    print 'args:'
+    print ' '.join(argspec['args'])
+    print 'kwargs:'
+    print ' '.join(argspec['varargs'])
+    print 'keywords:'
+    print ' '.join(argspec['keywords'])
+    print 'defaults:'
+    print ' '.join(argspec['defaults'])
+
 @command('exec', restrict='admins')
 def evil_exec(self, nick, host, channel, *args):
     """u don't know me"""
