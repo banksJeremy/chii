@@ -16,7 +16,7 @@ def build_lambda(args):
         name, args = name[:-1].split('(', 1)
     else:
         args = '*args, **kwargs'
-    definition = 'lambda nick, host, channel, %s: %s' % (args, ' '.join(body))
+    definition = 'lambda nick, host, channel, %s: %s' % (args, body)
     return name, definition
 
 @command('lambda')
@@ -25,6 +25,7 @@ def lambda_command(self, nick, host, channel, *args):
     # handle new lambda function creation
     try:
         name, definition = build_lambda(args)
+        print definition
         func = eval(definition)
     except Exception as e:
         return 'not a valid lambda function: %s' % e
