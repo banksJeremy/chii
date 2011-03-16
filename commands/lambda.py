@@ -17,15 +17,15 @@ def build_lambda(args):
     else:
         args = '*args, **kwargs'
     definition = 'lambda nick, host, channel, %s: %s' % (args, ' '.join(body))
-    func = eval(definition)
-    return name, func, definition
+    return name, definition
 
 @command('lambda')
 def lambda_command(self, nick, host, channel, *args):
     """add new functions to the bot using python lambda functions"""
     # handle new lambda function creation
     try:
-        name, func, definition = build_lambda(args)
+        name, definition = build_lambda(args)
+        func = eval(definition)
     except Exception as e:
         return 'not a valid lambda function: %s' % e
     if name in self.commands:
@@ -55,7 +55,8 @@ if PERSIST and SAVED_LAMBDAS:
     def load_lambdas(self, *args):
         for lambda_f in SAVED_LAMBDAS:
             try:
-                name, func, definition = build_lambda(args)
+                name, definition = build_lambda(args)
+                func = eval(definition)
             except Exception as e:
                 print 'not a valid lambda function: %s' % e
                 break
