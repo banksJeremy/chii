@@ -20,8 +20,7 @@ class ChiiConfig(dict):
         'nickname': 'chii',
         'realname': 'chii',
         'server': 'irc.esper.net',
-        'port': 6697,
-        'ssl': True,
+        'port': 6667,
         'channels': ['chiisadventure'],
         'cmd_prefix': '.',
         'modules': ['commands', 'events', 'tasks'],
@@ -156,7 +155,8 @@ class ChiiRegistry:
             for name in method._command_names:
                 if name in self.commands:
                     print 'Warning! commands registry already contains %s' % name
-                self.commands[name] = new.instancemethod(method, self, ChiiRegistry)
+		if name not in self.config['disabled_commands']:
+	                self.commands[name] = new.instancemethod(method, self, ChiiRegistry)
     
         def add_event(method):
             self.events[method._event_type].append(new.instancemethod(method, self, ChiiRegistry))
