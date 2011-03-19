@@ -38,13 +38,10 @@ def lambda_command(self, nick, host, channel, *args):
         self.config.save()
     def lambda_wrapper(nick, host, channel, *args):
         try:
-            args = eval(' '.join(args))
+            args = eval(' '.join(args) + ',')
         except:
             pass
-        if type(args) is tuple:
-            return str(func(nick, host, channel, *args))
-        else:
-            return str(func(nick, host, channel, args))
+        return str(func(nick, host, channel, *args))
     lambda_wrapper.__doc__ = "lambda function added by \002%s\002. %s" % (nick, definition)
     lambda_wrapper._restrict = None
     self.commands[name] = lambda_wrapper
@@ -66,13 +63,10 @@ if PERSIST and SAVED_LAMBDAS:
                     break
             def lambda_wrapper(nick, host, channel, *args):
                 try:
-                    args = eval(' '.join(args))
+                    args = eval(' '.join(args) + ',') 
                 except:
                     pass
-                if type(args) is tuple:
-                    return str(func(nick, host, channel, *args))
-                else:
-                    return str(func(nick, host, channel, args))
+                return str(func(nick, host, channel, *args))
             lambda_wrapper.__doc__ = "lambda function added by \002%s\002. %s" % (nick, definition)
             lambda_wrapper._restrict = None
             self.commands[name] = lambda_wrapper
