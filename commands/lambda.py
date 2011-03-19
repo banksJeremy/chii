@@ -16,29 +16,28 @@ def build_lambda(args):
         name, args = name[:-1].split('(', 1)
     else:
         args = '*args'
-    func = 'lambda nick, host, channel, %s: %s' % (args, body)
-    return func, name
+    func_s = 'lambda nick, host, channel, %s: %s' % (args, body)
+    return func_s, name
 
 @command('lambda', 'def')
 def lambda_command(self, nick, host, channel, *args):
     """add new functions to the bot using python lambda functions"""
     # build lambda, command name from args
-    func, name = build_lambda(args)
-    print func, name
+    func_s, name = build_lambda(args)
     # return if command by that name exists
     if name in self.commands:
         if hasattr(self.commands[name], '_registry'):
             return "lambda commands can't override normal commands"
     # try to eval our lambda function
     try:
-        func = eval(func)
+        func = eval(func_s)
     except Exception as e:
         return 'not a valid lambda function: %s' % e
     # save to config if persist_lambda is on
     if PERSIST:
         if not SAVED_LAMBDAS:
             self.config['lambdas'] = {}
-        self.config['lambdas'][name] = [func, nick]
+        self.config['lambdas'][name] = [func_s, nick]
         self.config.save()
     # build wrapper for our lambda
     def lambda_wrapper(nick, host, channel, *args):
@@ -49,7 +48,7 @@ def lambda_command(self, nick, host, channel, *args):
         print args
         return str(func(nick, host, channel, *args))
     # save lambda command into our command registry
-    lambda_wrapper.__doc__ = "lambda function added by \002%s\002. %s" % (nick, func)
+    lambda_wrapper.__doc__ = "lambda function added by \002%s\002. %s" % (nick, func_s)
     lambda_wrapper._restrict = None
     self.commands[name] = lambda_wrapper
     return 'added new lambda function to commands as %s' % name
@@ -59,7 +58,7 @@ if PERSIST and SAVED_LAMBDAS:
     def load_lambdas(self, *args):
         for name in SAVED_LAMBDAS:
             # build lambda, command name from args
-            func, name = build_lambda(args)
+            func_s, name = build_lambda(args)
             # return if command by that name exists
             if name in self.commands:
                 if hasattr(self.commands[name], '_registry'):
@@ -67,7 +66,7 @@ if PERSIST and SAVED_LAMBDAS:
                     break
             # try to eval our lambda function
             try:
-                func = eval(func)
+                func = eval(func_s)
             except Exception as e:
                 print 'not a valid lambda function: %s' % e
                 break
@@ -79,7 +78,7 @@ if PERSIST and SAVED_LAMBDAS:
                     pass
                 return str(func(nick, host, channel, *args))
             # save lambda command into our command registry
-            lambda_wrapper.__doc__ = "lambda function added by \002%s\002. %s" % (nick, func)
+            lambda_wrapper.__doc__ = "lambda function added by \002%s\002. %s" % (nick, func_s)
             lambda_wrapper._restrict = None
             self.commands[name] = lambda_wrapper
             print 'added new lambda function to commands as %s' % name
