@@ -45,7 +45,6 @@ def lambda_command(self, nick, host, channel, *args):
             args = eval(' '.join(args) + ',')
         except:
             pass
-        print args
         return str(func(nick, host, channel, *args))
     # save lambda command into our command registry
     lambda_wrapper.__doc__ = "lambda function added by \002%s\002. %s" % (nick, func_s)
