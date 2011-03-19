@@ -52,12 +52,12 @@ class Config(dict):
 
     def save(self):
         f = open(self.file, 'w')
-        f.write(yaml.dump(sorted(self), default_flow_style=False))
+        f.write(yaml.dump([{key: self.__getitem__(key)} for key in sorted(self.keys())], default_flow_style=False))
         f.close()
 
     def save_defaults(self):
         f = open(self.file, 'w')
-        f.write(yaml.dump(sorted(self.defaults), default_flow_style=False))
+        f.write(yaml.dump([{key:self.defaults[key]} for key in sorted(self.defaults)], default_flow_style=False))
         f.close()
 
 # get config
@@ -390,11 +390,16 @@ class ChiiFactory(protocol.ClientFactory):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='simple python bot')
     parser.add_argument('-c', '--config', metavar='config file', help='specify a non-default configuration file to use')
+    parser.add_argument('--save_defaults', metavar='config file', help='specify a non-default configuration file to use')
     args = parser.parse_args()
 
     if args.config:
-        # get config
         config = Config(args.config)
+    if args.save_defaults:
+        if not config:
+            config = Config(CONFIG_FILE)
+        config.save_defaults()
+        sys.exit(0)
 
     # no config? DIE
     if not config:

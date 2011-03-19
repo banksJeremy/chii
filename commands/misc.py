@@ -11,10 +11,10 @@ def get_random(items):
 def face(self, nick, host, channel, *args):
     """you need help with your face?"""
     if args:
-        madeof = [x[1:] for x in args if x.startswith('+')]
-        name = ' '.join([x for x in args if not x.startswith('+')])
-        if madeof:
-            madeof = ' and '.join(madeof)
+        args = ' '.join(args).split('+')
+        name = args[0].strip()
+        if len(args) > 1:
+            madeof = ' and '.join(x.strip() for x in args[1:])
             return "hahaha %s's face is made of %s" % (name, madeof)
         return "hahah %s's face" % name
     return 'hahah your face'
