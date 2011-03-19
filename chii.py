@@ -56,7 +56,7 @@ class Config(dict):
 
     def save(self):
         f = open(self.file, 'w')
-        f.write(yaml.dump(dict((key: self.__getitem__(key)) for key in sorted(self.keys())], default_flow_style=False))
+        f.write(yaml.dump(dict((key, self.__getitem__(key)) for key in sorted(self.keys())), default_flow_style=False))
         f.close()
 
     def save_defaults(self):
