@@ -41,8 +41,12 @@ class Config(dict):
         if os.path.isfile(file):
             with open(file) as f:
                 config = yaml.load(f.read())
-                for k in config:
-                    self.__setitem__(k, config[k])
+                if config:
+                    try:
+                        for k in config:
+                            self.__setitem__(k, config[k])
+                    except:
+                        pass
 
     def __getitem__(self, key):
         if self.__contains__(key):
@@ -52,12 +56,12 @@ class Config(dict):
 
     def save(self):
         f = open(self.file, 'w')
-        f.write(yaml.dump([{key: self.__getitem__(key)} for key in sorted(self.keys())], default_flow_style=False))
+        f.write(yaml.dump(dict((key: self.__getitem__(key)) for key in sorted(self.keys())], default_flow_style=False))
         f.close()
 
     def save_defaults(self):
         f = open(self.file, 'w')
-        f.write(yaml.dump([{key:self.defaults[key]} for key in sorted(self.defaults)], default_flow_style=False))
+        f.write(yaml.dump(dict((key, self.defaults[key]) for key in sorted(self.defaults)), default_flow_style=False))
         f.close()
 
 # get config
@@ -164,18 +168,18 @@ class Chii:
     def _add_to_registry(self, mod):
         """Adds registred methods to registry"""
         def add_command(method):
-            for name in method._command_names:
-                if name in self.commands:
-                    print 'Warning! commands registry already contains %s' % name
-                if name not in self.config['disabled_commands']:
+            if method.__name__ not in self.config['disabled_commands']:
+                for name in method._command_names:
+                    if name in self.commands:
+                        print 'Warning! commands registry already contains %s' % name
                     self.commands[name] = new.instancemethod(method, self, Chii)
     
         def add_event(method):
-            if name not in self.config['disabled_events']:
+            if method.__name__ not in self.config['disabled_events']:
                 self.events[method._event_type].append(new.instancemethod(method, self, Chii))
     
         def add_task(method):
-            if name not in self.config['disabled_tasks']:
+            if method.__name__ not in self.config['disabled_tasks']:
                 self.tasks.append(new.instancemethod(method, self, Chii))
 
         dispatch = {'commands': add_command, 'events': add_event, 'tasks': add_task}
@@ -390,20 +394,19 @@ class ChiiFactory(protocol.ClientFactory):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='simple python bot')
     parser.add_argument('-c', '--config', metavar='config file', help='specify a non-default configuration file to use')
-    parser.add_argument('--save_defaults', metavar='config file', help='specify a non-default configuration file to use')
+    parser.add_argument('--save-defaults', metavar='config file', nargs='?', const=True, help='specify a non-default configuration file to use', )
     args = parser.parse_args()
 
     if args.config:
         config = Config(args.config)
+
     if args.save_defaults:
-        if not config:
-            config = Config(CONFIG_FILE)
         config.save_defaults()
         sys.exit(0)
 
     # no config? DIE
     if not config:
-        print 'No config file found! Create', CONFIG_FILE
+        print 'No config file found! Create %s manually, or use --save-defaults to generate a new config file.', CONFIG_FILE
         sys.exit(1)
 
     # initialize logging
