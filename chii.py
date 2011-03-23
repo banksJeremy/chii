@@ -277,6 +277,31 @@ class Chii:
         for delay, line in enumerate(msg.split('\n')):
             self.msg_later(channel, line, delay)
 
+    def _call_later(self, delay, func, *args):
+        """uses reactor.callLater to call function at a later point, returns deferred object"""
+        d = defer.Deferred()
+        reactor.callLater(delay, d.callback, None)
+        d.addCallback(lambda x: func(*args))
+        return d
+
+    def _deferred(self):
+        """returns a deferred object"""
+        d = defer.Deferred()
+        return d
+
+    def _deferred_func(self, cb, func, *args):
+        """defers a func, sets callback, returns deferred object"""
+        d = defer.Deferred()
+        d.addCallback(cb)
+        d.callback(func(*args))
+        return d
+
+    def _deferred_to_thread(self, cb, func, *args):
+        """defers func to another thread, returns deferred object"""
+        d = threads.deferToThread(func, *args)
+        d.addCallback(lambda result: cb(result))
+        return d
+
     def msg_later(self, channel, msg, delay):
         """uses reactor.callLater to send a message after a given delay"""
         d = defer.Deferred()
