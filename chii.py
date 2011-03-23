@@ -232,37 +232,44 @@ class Chii:
             print '[events]', ':'.join(sorted(x + ', ' + ', '.join(sorted(y.__name__ for y in self.events[x])) for x in self.events))
             print '[tasks]', ', '.join(sorted(x for x in self.tasks))
 
+    def _deferred_command(self, command, channel, nick, host, msg):
+        if len(msg) > 1:
+            args = msg[1:]
+        else:
+            args = ()
+        try:
+            response = command(channel, nick, host, *args)
+        except Exception as e:
+            response = 'ur shit am fuked! %s' % e
+            traceback.print_exc()
+        if response:
+            self.msg(channel, response)
+            self.logger.log("<%s> %s" % (self.nickname, response))
+
+    def _deferred_event(self, event, respond_to=None, *args):
+        """A deferred event"""
+        try:
+            response = event(*args)
+        except Exception as e:
+            response = 'ur shit am fuked! %s' % e
+            traceback.print_exc()
+        if response and respond_to:
+            # only return something if this event is caught in a channel
+            self.msg(respond_to, response)
+            self.logger.log("<%s> %s" % (self.nickname, response))
+
     def _handle_command(self, channel, nick, host, msg):
         """Handles commands, passing them proper args, etc"""
         msg = msg.split()
-        command, args = msg[0][1:].lower(), []
-        command = self.commands.get(command, None)
+        command = self.commands.get(msg[0][1:].lower(), None)
         if command:
             if self.check_permission(command._restrict, nick, host):
-                if len(msg) > 1:
-                    args = msg[1:]
-                try:
-                    response = command(channel, nick, host, *args)
-                except Exception as e:
-                    response = 'ur shit am fuked! %s' % e
-                    traceback.print_exc()
-                if response:
-                    self.msg(channel, response)
-                    self.logger.log("<%s> %s" % (self.nickname, response))
-
+                threads.deferToThread(self._deferred_command, command, channel, nick, host, msg)
 
     def _handle_event(self, event_type, respond_to=None, *args):
         """Handles event and catches errors, returns result of event as bot message"""
         for event in self.events[event_type]:
-            try:
-                response = event(*args)
-            except Exception as e:
-                response = 'ur shit am fuked! %s' % e
-                traceback.print_exc()
-            if response and respond_to:
-                # only return something if this event is caught in a channel
-                self.msg(respond_to, response)
-                self.logger.log("<%s> %s" % (self.nickname, response))
+            threads.deferToThread(self._deferred_event, event, respond_to, *args)
 
     def check_permission(self, restrict_to, nick, host):
         if restrict_to is None:
@@ -345,12 +352,12 @@ class Chii:
             repeat = repeat * time_scale[scale[:3]]
             lc = loop_task(func, repeat)
 
-    def _start_tasks(self):
+    def _handle_tasks(self):
         """starts all tasks"""
         if self.tasks:
             for task in self.tasks:
                 func, repeat, scale = self.tasks[task]
-                self.start_task(task, func, repeat, scale)
+                threads.deferToThread(self.start_task, task, func, repeat, scale)
 
     def _stop_tasks(self):
         """stop all running tasks"""
@@ -386,7 +393,7 @@ class ChiiBot(irc.IRCClient, Chii):
         self.logger.log("[connected at %s]" % time.asctime(time.localtime(time.time())))
         self._update_registry()
         self._handle_event('load')
-        self._start_tasks()
+        self._handle_tasks()
 
     def connectionLost(self, reason):
         irc.IRCClient.connectionLost(self, reason)
@@ -516,4 +523,5 @@ if __name__ == '__main__':
         reactor.connectTCP(config['server'], config['port'], factory)
 
     # run bot
+    reactor.suggestThreadPoolSize(4)
     reactor.run()
