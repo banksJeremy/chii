@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from twisted.words.protocols import irc
 from twisted.internet import reactor, protocol, defer, threads
+from twisted.internet.task import LoopingCall
 from twisted.python import log
 
 import yaml
@@ -116,15 +117,16 @@ def event(event_type):
         return wrapper
     return decorator
 
-def task(*args):
+def task(repeat, scale=None):
     """Decorator which adds callable to task registry"""
     def decorator(func):
         def wrapper(*func_args, **func_kwargs):
             return func(*func_args, **func_kwargs)
+        wrapper._registry = 'tasks'
         wrapper.__name__ = func.__name__
         wrapper.__doc__ = func.__doc__
-        wrapper._registry = 'tasks'
-        wrapper._task_interval = args[0]
+        wrapper._task_repeat = repeat
+        wrapper._task_scale = scale
         return wrapper
     return decorator
 
@@ -180,7 +182,7 @@ class Chii:
     
         def add_task(method):
             if method.__name__ not in self.config['disabled_tasks']:
-                self.tasks.append(new.instancemethod(method, self, Chii))
+                self.tasks[method.__name__] = (new.instancemethod(method, self, Chii), method._task_repeat, method._task_scale)
 
         dispatch = {'commands': add_command, 'events': add_event, 'tasks': add_task}
 
@@ -216,7 +218,7 @@ class Chii:
         if paths:
             self.commands = {}
             self.events = defaultdict(list)
-            self.tasks = []
+            self.tasks = {}
             for path in paths:
                 path = os.path.abspath(path)
                 package = os.path.split(path)[-1]
@@ -227,7 +229,7 @@ class Chii:
                         if mod:
                             self._add_to_registry(mod)
             print '[commands]', ', '.join(sorted(x for x in self.commands))
-            print '[events]', ': '.join(sorted(x + ': ' + ', '.join(sorted(y.__name__ for y in self.events[x])) for x in self.events))
+            print '[events]', ':'.join(sorted(x + ', ' + ', '.join(sorted(y.__name__ for y in self.events[x])) for x in self.events))
             print '[tasks]', ', '.join(sorted(x for x in self.tasks))
 
     def _handle_command(self, channel, nick, host, msg):
@@ -294,6 +296,53 @@ class Chii:
         d.addCallback(lambda result: self.msg(channel, str(result)))
         d.addErrback(lambda err: self.msg(channel, err))
 
+
+    def start_task(self, name, func, repeat=60, scale=None):
+        """repeats task at a given delay given in seconds, minutes, hours, days or weeks"""
+        def loop_task(func, repeat):
+            lc = LoopingCall(func)
+            lc.start(repeat)
+            if not hasattr(self, 'running_tasks'):
+                self.running_tasks = {}
+            self.running_tasks[func.__name__] = lc
+            print 'starting task %s. repeating every %s' % (name, self._fmt_time(repeat))
+
+        time_scale = {
+            'min': 60,
+            'hou': 3600,
+            'day': 86400,
+            'wee': 604800,
+        }
+
+        if type(repeat) is not int:
+            repeat = 1
+            scale = repeat
+        if scale is None:
+            lc = loop_task(func, repeat)
+        elif scale[:3] in time_scale:
+            repeat = repeat * time_scale[scale[:3]]
+            lc = loop_task(func, repeat)
+
+    def _start_tasks(self):
+        """starts all tasks"""
+        if self.tasks:
+            for task in self.tasks:
+                func, repeat, scale = self.tasks[task]
+                self.start_task(task, func, repeat, scale)
+
+    def _stop_tasks(self):
+        """stop all running tasks"""
+        for task in self.running_tasks:
+            task.stop()
+
+    def _fmt_time(self, s):
+        """returns formatted time"""
+        d, remainder = divmod(s, 86400)
+        h, remainder = divmod(remainder, 3600)
+        m, s = divmod(remainder, 60)
+        time = {d: 'days', h: 'hours', m: 'minutes', s: 'seconds'}
+        return ' '.join(' '.join((str(x), time[x])) for x in (d, h, m, s) if x is not 0)
+
 ### twisted protocol/factory ###
 class ChiiBot(irc.IRCClient, Chii):
     config = config
@@ -315,6 +364,7 @@ class ChiiBot(irc.IRCClient, Chii):
         self.logger.log("[connected at %s]" % time.asctime(time.localtime(time.time())))
         self._update_registry()
         self._handle_event('load')
+        self._start_tasks()
 
     def connectionLost(self, reason):
         irc.IRCClient.connectionLost(self, reason)
