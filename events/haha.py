@@ -23,7 +23,7 @@ if THRESHOLD:
     )
 
     @event('msg')
-    def haha(self, nick, host, channel, msg):
+    def haha(self, channel, nick, host, msg):
         if random.random() < self.config['haha_threshold']:
             if 'haha' in msg.lower():
                 haha = ''
@@ -32,7 +32,7 @@ if THRESHOLD:
                 return haha
 
     @command
-    def hat(self, nick, host, channel, threshold=None):
+    def hat(self, channel, nick, host, threshold=None):
         """set's threshold for random laughter. must be a float between 0.01 and 0.99"""
         if threshold:
             try:

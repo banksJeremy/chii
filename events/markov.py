@@ -51,7 +51,7 @@ if BRAIN:
             return sentence
 
     @event('msg')
-    def markov(self, nick, host, channel, msg):
+    def markov(self, channel, nick, host, msg):
         def clean_sentence(sentence):
             sentence = sentence.replace('"', '')
             if sentence[-1] in (',', ';'):
