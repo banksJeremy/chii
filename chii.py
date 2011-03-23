@@ -35,6 +35,7 @@ class Config(dict):
         'disabled_commands': [],
         'disabled_events': [],
         'disabled_tasks': [],
+        'threaded': False,
     }
 
     def __init__(self, file):
@@ -232,7 +233,9 @@ class Chii:
             print '[events]', ':'.join(sorted(x + ', ' + ', '.join(sorted(y.__name__ for y in self.events[x])) for x in self.events))
             print '[tasks]', ', '.join(sorted(x for x in self.tasks))
 
-    def _deferred_command(self, command, channel, nick, host, msg):
+    # command, event task methods that execute specify commands for given behavior
+    def _command(self, command, channel, nick, host, msg):
+        """excecutes a command"""
         if len(msg) > 1:
             args = msg[1:]
         else:
@@ -246,8 +249,8 @@ class Chii:
             self.msg(channel, response)
             self.logger.log("<%s> %s" % (self.nickname, response))
 
-    def _deferred_event(self, event, respond_to=None, *args):
-        """A deferred event"""
+    def _event(self, event, respond_to=None, *args):
+        """executes an event"""
         try:
             response = event(*args)
         except Exception as e:
@@ -258,32 +261,86 @@ class Chii:
             self.msg(respond_to, response)
             self.logger.log("<%s> %s" % (self.nickname, response))
 
+    def _task(self, name, func, repeat=60, scale=None):
+        """executes looping task"""
+        def loop_task(func, repeat):
+            lc = LoopingCall(func)
+            lc.start(repeat)
+            if not hasattr(self, 'running_tasks'):
+                self.running_tasks = {}
+            self.running_tasks[func.__name__] = lc
+            print 'starting task %s. repeating every %s' % (name, self._fmt_time(repeat))
+
+        time_scale = {
+            'min': 60,
+            'hou': 3600,
+            'day': 86400,
+            'wee': 604800,
+        }
+
+        if type(repeat) is not int:
+            repeat = 1
+            scale = repeat
+        if scale is None:
+            lc = loop_task(func, repeat)
+        elif scale[:3] in time_scale:
+            repeat = repeat * time_scale[scale[:3]]
+            lc = loop_task(func, repeat)
+
+    # command, event, task handlers
     def _handle_command(self, channel, nick, host, msg):
         """Handles commands, passing them proper args, etc"""
         msg = msg.split()
         command = self.commands.get(msg[0][1:].lower(), None)
         if command:
-            if self.check_permission(command._restrict, nick, host):
-                threads.deferToThread(self._deferred_command, command, channel, nick, host, msg)
+            if self._check_permission(command._restrict, nick, host):
+                if self.config['threaded']:
+                    threads.deferToThread(self._command, command, channel, nick, host, msg)
+                else:
+                    defer.execute(self._command, command, channel, nick, host, msg)
 
     def _handle_event(self, event_type, respond_to=None, *args):
         """Handles event and catches errors, returns result of event as bot message"""
         for event in self.events[event_type]:
-            threads.deferToThread(self._deferred_event, event, respond_to, *args)
+            if self.config['threaded']:
+                threads.deferToThread(self._event, event, respond_to, *args)
+            else:
+                defer.execute(self._event, event, respond_to, *args)
 
-    def check_permission(self, restrict_to, nick, host):
-        if restrict_to is None:
-            return True
-        for member in (nick, host, '!'.join((nick, host))):
-            if member in self.config['user_roles'][restrict_to]:
-                return True
-        return False
+    def _handle_tasks(self):
+        """starts all tasks"""
+        if self.tasks:
+            for task in self.tasks:
+                func, repeat, scale = self.tasks[task]
+                if self.config['threaded']:
+                    threads.deferToThread(self._task, task, func, repeat, scale)
+                else:
+                    defer.execute(self._task, task, func, repeat, scale)
 
-    def no_flood_msg(self, channel, msg):
+    # a couple of ways to do deferred messaging
+    def batch_msg(self, channel, msg):
         """tries to prevent flooding by sending messages staggered 1 second per line"""
         for delay, line in enumerate(msg.split('\n')):
             self.msg_later(channel, line, delay)
 
+    def msg_later(self, channel, msg, delay):
+        """uses reactor.callLater to send a message after a given delay"""
+        d = defer.Deferred()
+        reactor.callLater(delay, d.callback, None)
+        d.addCallback(lambda x: self.msg(channel, msg))
+
+    def msg_deferred(self, channel, func, *args):
+        """returns deferred result of func as message to given channel"""
+        d = defer.Deferred()
+        d.addCallback(lambda result: self.msg(channel, str(result)))
+        d.callback(func(*args))
+
+    def msg_defer_to_thread(self, channel, func, *args):
+        """returns deferred result of func as message to given channel (using deferToThread)"""
+        d = threads.deferToThread(func, *args)
+        d.addCallback(lambda result: self.msg(channel, str(result)))
+
+    # some extra deferred wrappers
     def _call_later(self, delay, func, *args):
         """uses reactor.callLater to call function at a later point, returns deferred object"""
         d = defer.Deferred()
@@ -309,60 +366,15 @@ class Chii:
         d.addCallback(lambda result: cb(result))
         return d
 
-    def msg_later(self, channel, msg, delay):
-        """uses reactor.callLater to send a message after a given delay"""
-        d = defer.Deferred()
-        reactor.callLater(delay, d.callback, None)
-        d.addCallback(lambda x: self.msg(channel, msg))
-
-    def msg_deferred(self, channel, func, *args):
-        """returns deferred result of func as message to given channel"""
-        d = defer.Deferred()
-        d.addCallback(lambda result: self.msg(channel, str(result)))
-        d.callback(func(*args))
-
-    def msg_defer_to_thread(self, channel, func, *args):
-        """returns deferred result of func as message to given channel (using deferToThread)"""
-        d = threads.deferToThread(func, *args)
-        d.addCallback(lambda result: self.msg(channel, str(result)))
-
-    def start_task(self, name, func, repeat=60, scale=None):
-        """repeats task at a given delay given in seconds, minutes, hours, days or weeks"""
-        def loop_task(func, repeat):
-            lc = LoopingCall(func)
-            lc.start(repeat)
-            if not hasattr(self, 'running_tasks'):
-                self.running_tasks = {}
-            self.running_tasks[func.__name__] = lc
-            print 'starting task %s. repeating every %s' % (name, self._fmt_time(repeat))
-
-        time_scale = {
-            'min': 60,
-            'hou': 3600,
-            'day': 86400,
-            'wee': 604800,
-        }
-
-        if type(repeat) is not int:
-            repeat = 1
-            scale = repeat
-        if scale is None:
-            lc = loop_task(func, repeat)
-        elif scale[:3] in time_scale:
-            repeat = repeat * time_scale[scale[:3]]
-            lc = loop_task(func, repeat)
-
-    def _handle_tasks(self):
-        """starts all tasks"""
-        if self.tasks:
-            for task in self.tasks:
-                func, repeat, scale = self.tasks[task]
-                threads.deferToThread(self.start_task, task, func, repeat, scale)
-
-    def _stop_tasks(self):
-        """stop all running tasks"""
-        for task in self.running_tasks:
-            task.stop()
+    # misc functions
+    def _check_permission(self, restrict_to, nick, host):
+        """checks whether nick, host, or nick!host has required role"""
+        if restrict_to is None:
+            return True
+        for member in (nick, host, '!'.join((nick, host))):
+            if member in self.config['user_roles'][restrict_to]:
+                return True
+        return False
 
     def _fmt_time(self, s):
         """returns formatted time"""
@@ -371,6 +383,7 @@ class Chii:
         m, s = divmod(remainder, 60)
         time = {d: 'days', h: 'hours', m: 'minutes', s: 'seconds'}
         return ' '.join(' '.join((str(x), time[x])) for x in (d, h, m, s) if x is not 0)
+
 
 ### twisted protocol/factory ###
 class ChiiBot(irc.IRCClient, Chii):

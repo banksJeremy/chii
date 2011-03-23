@@ -48,7 +48,7 @@ def help(self, channel, nick, host, command=None, *args):
     """returns help nogga"""
     commands = filter(lambda x: self.commands[x]._restrict is None, self.commands)
     for role in self.config['user_roles']:
-        if self.check_permission(role, nick, host):
+        if self._check_permission(role, nick, host):
             commands.extend(filter(lambda x: self.commands[x]._restrict == role, self.commands))
 
     if command in commands:
