@@ -40,7 +40,7 @@ def config(self, nick, host, channel, *args):
 def rehash(self, nick, host, channel, *args):
     """u don't know me"""
     self._update_registry()
-    self._handle_event('load', False)
+    self._handle_event('load')
     return '\002rehash !!\002 rehashed'
 
 @command

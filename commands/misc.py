@@ -97,7 +97,7 @@ def haha(self, nick, host, channel, *args):
     ]
     haha = 'haha'
     if args:
-        haha = ''.join([get_random(laughter) for laugh in args])
+        haha = ''.join([get_random(laughter) for x in range(len(''.join(args)))])
     return haha
 
 @command

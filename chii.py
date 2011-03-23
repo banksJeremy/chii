@@ -3,7 +3,7 @@ import argparse, new, os, sys, time, traceback
 from collections import defaultdict
 
 from twisted.words.protocols import irc
-from twisted.internet import reactor, protocol, defer
+from twisted.internet import reactor, protocol, defer, threads
 from twisted.python import log
 
 import yaml
@@ -274,6 +274,24 @@ class Chii:
             if member in self.config['user_roles'][restrict_to]:
                 return True
         return False
+
+    def msg_Deferred(self, channel, func, *args):
+        """returns deferred result of func as message to given channel"""
+        d = defer.Deferred(func, *args)
+        d.addCallback(self._deferred_msg_cb, channel)
+        d.addCallback(self._deferred_msg_err, channel)
+
+    def msg_deferToThread(self, channel, func, *args):
+        """returns deferred result of func as message to given channel (using deferToThread)"""
+        dt = threads.deferToThread(func, *args)
+        dt.addCallback(self._deferred_msg_cb, channel)
+        dt.addErrback(self._deferred_msg_err, channel)
+
+    def _deferred_msg_cb(self, result, channel):
+        self.msg(channel, str(result))
+
+    def _deferred_msg_err(self, err, channel):
+        self.msg(channel, 'error! %s' % err)
 
 
 ### twisted protocol/factory ###
