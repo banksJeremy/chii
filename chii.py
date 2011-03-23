@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import argparse, new, os, sys, time, traceback
+import argparse, datetime, new, os, sys, time, traceback, zlib
 from collections import defaultdict
 
 from twisted.words.protocols import irc
@@ -115,6 +115,7 @@ def event(event_type):
         wrapper._event_type = event_type
         wrapper.__name__ = func.__name__
         wrapper.__doc__ = func.__doc__
+        wrapper.__hash__ = lambda *args: zlib.crc32(func.__name__)
         return wrapper
     return decorator
 
@@ -168,24 +169,27 @@ class Logger:
 
 class Chii:
     """Application logic for our chiibot"""
+    def _add_command(self, method):
+        """add new instance method to self.commands"""
+        if method.__name__ not in self.config['disabled_commands']:
+            for name in method._command_names:
+                if name in self.commands:
+                    print 'Warning! commands registry already contains %s' % name
+                self.commands[name] = new.instancemethod(method, self, Chii)
+
+    def _add_event(self, method):
+        """add new instance method to self.events"""
+        if method.__name__ not in self.config['disabled_events']:
+            self.events[method._event_type].add(new.instancemethod(method, self, Chii))
+
+    def _add_task(self, method):
+        """add new instance method to self.tasks"""
+        if method.__name__ not in self.config['disabled_tasks']:
+            self.tasks[method.__name__] = (new.instancemethod(method, self, Chii), method._task_repeat, method._task_scale)
+
     def _add_to_registry(self, mod):
         """Adds registred methods to registry"""
-        def add_command(method):
-            if method.__name__ not in self.config['disabled_commands']:
-                for name in method._command_names:
-                    if name in self.commands:
-                        print 'Warning! commands registry already contains %s' % name
-                    self.commands[name] = new.instancemethod(method, self, Chii)
-    
-        def add_event(method):
-            if method.__name__ not in self.config['disabled_events']:
-                self.events[method._event_type].append(new.instancemethod(method, self, Chii))
-    
-        def add_task(method):
-            if method.__name__ not in self.config['disabled_tasks']:
-                self.tasks[method.__name__] = (new.instancemethod(method, self, Chii), method._task_repeat, method._task_scale)
-
-        dispatch = {'commands': add_command, 'events': add_event, 'tasks': add_task}
+        dispatch = {'commands': self._add_command, 'events': self._add_event, 'tasks': self._add_task}
 
         registered = filter(lambda x: hasattr(x, '_registry'), (getattr(mod, x) for x in dir(mod) if not x.startswith('_')))
         for method in registered:
@@ -218,8 +222,9 @@ class Chii:
         paths = self.config['modules']
         if paths:
             self.commands = {}
-            self.events = defaultdict(list)
+            self.events = defaultdict(set)
             self.tasks = {}
+            self.running_tasks = {}
             for path in paths:
                 path = os.path.abspath(path)
                 package = os.path.split(path)[-1]
@@ -249,7 +254,7 @@ class Chii:
             self.msg(channel, response)
             self.logger.log("<%s> %s" % (self.nickname, response))
 
-    def _event(self, event, respond_to=None, *args):
+    def _event(self, event, args=(), respond_to=False):
         """executes an event"""
         try:
             response = event(*args)
@@ -266,10 +271,8 @@ class Chii:
         def loop_task(func, repeat):
             lc = LoopingCall(func)
             lc.start(repeat)
-            if not hasattr(self, 'running_tasks'):
-                self.running_tasks = {}
             self.running_tasks[func.__name__] = lc
-            print 'starting task %s. repeating every %s' % (name, self._fmt_time(repeat))
+            print 'starting task %s. repeating every %s' % (name, self._fmt_seconds(repeat))
 
         time_scale = {
             'min': 60,
@@ -286,10 +289,12 @@ class Chii:
         elif scale[:3] in time_scale:
             repeat = repeat * time_scale[scale[:3]]
             lc = loop_task(func, repeat)
+        else:
+            lc = None
 
     # command, event, task handlers
     def _handle_command(self, channel, nick, host, msg):
-        """Handles commands, passing them proper args, etc"""
+        """handles command dispatch"""
         msg = msg.split()
         command = self.commands.get(msg[0][1:].lower(), None)
         if command:
@@ -299,15 +304,15 @@ class Chii:
                 else:
                     defer.execute(self._command, command, channel, nick, host, msg)
 
-    def _handle_event(self, event_type, respond_to=None, *args):
-        """Handles event and catches errors, returns result of event as bot message"""
+    def _handle_event(self, event_type, args=(), respond_to=False):
+        """handles event dispatch"""
         for event in self.events[event_type]:
             if self.config['threaded']:
-                threads.deferToThread(self._event, event, respond_to, *args)
+                threads.deferToThread(self._event, event, args, respond_to)
             else:
-                defer.execute(self._event, event, respond_to, *args)
+                defer.execute(self._event, event, args, respond_to)
 
-    def _handle_tasks(self):
+    def _start_tasks(self):
         """starts all tasks"""
         if self.tasks:
             for task in self.tasks:
@@ -316,6 +321,11 @@ class Chii:
                     threads.deferToThread(self._task, task, func, repeat, scale)
                 else:
                     defer.execute(self._task, task, func, repeat, scale)
+
+    def _stop_tasks(self):
+        """stops all tasks"""
+        for task in self.tasks:
+            self.running_tasks[task].stop()
 
     # a couple of ways to do deferred messaging
     def batch_msg(self, channel, msg):
@@ -376,7 +386,7 @@ class Chii:
                 return True
         return False
 
-    def _fmt_time(self, s):
+    def _fmt_seconds(self, s):
         """returns formatted time"""
         d, remainder = divmod(s, 86400)
         h, remainder = divmod(remainder, 3600)
@@ -406,7 +416,7 @@ class ChiiBot(irc.IRCClient, Chii):
         self.logger.log("[connected at %s]" % time.asctime(time.localtime(time.time())))
         self._update_registry()
         self._handle_event('load')
-        self._handle_tasks()
+        self._start_tasks()
 
     def connectionLost(self, reason):
         irc.IRCClient.connectionLost(self, reason)
@@ -416,10 +426,25 @@ class ChiiBot(irc.IRCClient, Chii):
     def signedOn(self):
         """Called when bot has succesfully signed on to server."""
         self.setNick(self.nickname)
-        if self.config['identpass']:
-            self.msg('nickserv', 'identify %s' % self.config['identpass'])
+        if self.config['ident_pass']:
+            self.msg('nickserv', 'identify %s' % self.config['ident_pass'])
         for channel in self.config['channels']:
             self.join(channel)
+
+    def whois(self, user, channel=None):
+        """Retrieve information about the specified user."""
+        if not hasattr(self, '_saved_whois'):
+            self._saved_whois = {}
+        self._current_whois = (channel, user)
+        self._saved_whois[user] = {
+            'user': None,
+            'server': None,
+            'operator': False,
+            'idle': 0,
+            'channels': [],
+            'added': datetime.datetime.now()
+        }
+        self.sendLine('WHOIS ' + user)
 
     def joined(self, channel):
         """This will get called when the bot joins a channel."""
@@ -433,10 +458,10 @@ class ChiiBot(irc.IRCClient, Chii):
         # handle message events
         if channel == self.nickname:
             channel = nick # there is no channel, so set channel to nick so response goes some place (if there is one)
-            self._handle_event('privmsg', channel, channel, nick, host, msg)
+            self._handle_event('privmsg', args=(channel, nick, host, msg), respond_to=channel)
         else:
-            self._handle_event('pubmsg', channel, channel, nick, host, msg)
-        self._handle_event('msg', channel, channel, nick, host, msg)
+            self._handle_event('pubmsg', args=(channel, nick, host, msg), respond_to=channel)
+        self._handle_event('msg', args=(channel, nick, host, msg), respond_to=channel)
 
         # Check if we're getting a command
         if msg.startswith(self.config['cmd_prefix']):
@@ -445,7 +470,7 @@ class ChiiBot(irc.IRCClient, Chii):
     def action(self, user, channel, msg):
         """This will get called when the bot sees someone do an action."""
         nick, host = user.split('!')
-        self._handle_event('action', channel, nick, host, channel, msg)
+        self._handle_event('action', channel, channel, nick, host, msg)
         self.logger.log("* %s %s" % (nick, msg))
 
     def userJoined(self, user, channel):
@@ -488,6 +513,42 @@ class ChiiBot(irc.IRCClient, Chii):
             self.setNick(self.nickname)
         else:
             self.setNick(self.alterCollidedNick(self._attemptedNick))
+
+    def irc_RPL_WHOISUSER(self, prefix, params):
+        channel, user = self._current_whois
+        self._saved_whois[user]['user'] = (params[2], params[3], params[5])
+
+    def irc_RPL_WHOISSERVER(self, prefix, params):
+        channel, user = self._current_whois
+        self._saved_whois[user]['server'] = (params[2], params[3])
+
+    def irc_RPL_WHOISOPERATOR(self, prefix, params):
+        channel, user = self._current_whois
+        self._saved_whois[user]['operator'] = True
+
+    def irc_RPL_WHOISIDLE(self, prefix, params):
+        channel, user = self._current_whois
+        self._saved_whois[user]['idle'] = int(params[2])
+
+    def irc_RPL_WHOISCHANNELS(self, prefix, params):
+        channel, user = self._current_whois
+        self._saved_whois[user]['channels'].extend(params[2].split())
+
+    def irc_RPL_ENDOFWHOIS(self, prefix, params):
+        channel, user = self._current_whois
+        if channel:
+            a, c, i, o, s, u = [self._saved_whois[user][x] for x in sorted(self._saved_whois[user])]
+            self.msg(channel, '\002user\002: %s!%s@%s' % u)
+            self.msg(channel, '\002server\002: %s - %s' % s)
+            self.msg(channel, '\002operator\002: %s' % o)
+            self.msg(channel, '\002idle\002: %s' % self._fmt_seconds(i))
+            self.msg(channel, '\002channels\002: %s' % ' '.join(x for x in c))
+
+    def irc_ERR_NOSUCHNICK(self, prefix, params):
+        channel, user = self._current_whois
+        if channel:
+            self.msg(channel, 'no such user \002%s' % user)
+
 
 class ChiiFactory(protocol.ClientFactory):
     """A factory for ChiiBots."""

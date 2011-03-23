@@ -61,7 +61,7 @@ def build_lambda(args):
         name, args = name[:-1].split('(', 1)
     else:
         args = '*args'
-    func_s = 'lambda channel, nick, host, %s: %s' % (args, body)
+    func_s = 'lambda channel, nick, host, %s:%s' % (args, body)
     return func_s, name
 
 def wrap_lambda(func, func_s, name, nick):

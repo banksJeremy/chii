@@ -14,6 +14,8 @@ def config(self, channel, nick, host, *args):
         config.update(self.config)
         if opt in config:
             return '\002%s\002: %s' % (opt, str(config[opt]))
+        else:
+            return '\002%s\002 is not set' % opt
 
     def set(args):
         if args[1] != '=':
@@ -25,11 +27,8 @@ def config(self, channel, nick, host, *args):
         except:
             pass
         self.config[k] = v
-        return '\002%s\002: %s' % (k, str(v))
-
-    def save(args):
         self.config.save()
-        return 'Saved configuration!'
+        return '\002%s\002: %s' % (k, str(v))
 
     def error(args):
         return 'dong it rong'
@@ -39,7 +38,6 @@ def config(self, channel, nick, host, *args):
         (lambda x: not x)(args): list,
         (lambda x: bool(x))(args): show,
         (lambda x: x and len(x) > 2)(args): set,
-        (lambda x: x and x[0] == 'save')(args): save,
     }.get(True, error)
 
     return dispatch(args)
@@ -47,8 +45,10 @@ def config(self, channel, nick, host, *args):
 @command(restrict='admins')
 def rehash(self, channel, nick, host, *args):
     """u don't know me"""
+    self._stop_tasks()
     self._update_registry()
     self._handle_event('load')
+    self._start_tasks()
     return '\002rehash !!\002 rehashed'
 
 @command
@@ -95,6 +95,14 @@ def mode(self, channel, nick, host, *args):
     """change the game"""
     new_mode = 'MODE %s' % ' '.join(args)
     self.sendLine(new_mode)
+
+@command
+def whois(self, channel, nick, host, *args):
+    """returns whois information"""
+    if len(args) is 1:
+        self.whois(args[0], channel)
+    else:
+        return 'dong it rong'
 
 def op(self): pass
 
