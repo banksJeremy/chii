@@ -536,5 +536,6 @@ if __name__ == '__main__':
         reactor.connectTCP(config['server'], config['port'], factory)
 
     # run bot
-    reactor.suggestThreadPoolSize(4)
+    if config['theaded']:
+        reactor.suggestThreadPoolSize(4)
     reactor.run()

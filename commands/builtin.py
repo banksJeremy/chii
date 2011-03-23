@@ -8,6 +8,13 @@ def config(self, channel, nick, host, *args):
         config.update(self.config)
         return ' '.join('\002%s\002: %s' % (x[0], str(x[1])) for x in config.iteritems())
 
+    def show(args):
+        opt = args[0]
+        config = self.config.defaults.copy()
+        config.update(self.config)
+        if opt in config:
+            return '\002%s\002: %s' % (opt, str(config[opt]))
+
     def set(args):
         if args[1] != '=':
             return error()
@@ -17,8 +24,8 @@ def config(self, channel, nick, host, *args):
             v = eval(v)
         except:
             pass
-        self.config[k] = v       
-        return 'set %s to %s' % (k, str(v))
+        self.config[k] = v
+        return '\002%s\002: %s' % (k, str(v))
 
     def save(args):
         self.config.save()
@@ -30,6 +37,7 @@ def config(self, channel, nick, host, *args):
     # do not try this at home kids
     dispatch = {
         (lambda x: not x)(args): list,
+        (lambda x: bool(x))(args): show,
         (lambda x: x and len(x) > 2)(args): set,
         (lambda x: x and x[0] == 'save')(args): save,
     }.get(True, error)
