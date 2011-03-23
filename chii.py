@@ -282,20 +282,17 @@ class Chii:
         d = defer.Deferred()
         reactor.callLater(delay, d.callback, None)
         d.addCallback(lambda x: self.msg(channel, msg))
-        d.addErrback(lambda err: self.msg(channel, err))
 
-    def func_defer(self, channel, func, *args):
+    def msg_deferred(self, channel, func, *args):
         """returns deferred result of func as message to given channel"""
         d = defer.Deferred()
         d.addCallback(lambda result: self.msg(channel, str(result)))
         d.callback(func(*args))
 
-    def func_defer_to_thread(self, channel, func, *args):
+    def msg_defer_to_thread(self, channel, func, *args):
         """returns deferred result of func as message to given channel (using deferToThread)"""
         d = threads.deferToThread(func, *args)
         d.addCallback(lambda result: self.msg(channel, str(result)))
-        d.addErrback(lambda err: self.msg(channel, err))
-
 
     def start_task(self, name, func, repeat=60, scale=None):
         """repeats task at a given delay given in seconds, minutes, hours, days or weeks"""
