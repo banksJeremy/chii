@@ -270,23 +270,29 @@ class Chii:
                 return True
         return False
 
-    def msg_defer(self, channel, func, *args):
+    def no_flood_msg(self, channel, msg):
+        """tries to prevent flooding by sending messages staggered 1 second per line"""
+        for delay, line in enumerate(msg.split('\n')):
+            self.msg_later(channel, line, delay)
+
+    def msg_later(self, channel, msg, delay):
+        """uses reactor.callLater to send a message after a given delay"""
+        d = defer.Deferred()
+        reactor.callLater(delay, d.callback, None)
+        d.addCallback(lambda x: self.msg(channel, msg))
+        d.addErrback(lambda err: self.msg(channel, err))
+
+    def func_defer(self, channel, func, *args):
         """returns deferred result of func as message to given channel"""
-        d = defer.Deferred(func, *args)
-        d.addCallback(self._deferred_msg_cb, channel)
-        d.addCallback(self._deferred_msg_err, channel)
+        d = defer.Deferred()
+        d.addCallback(lambda result: self.msg(channel, str(result)))
+        d.callback(func(*args))
 
-    def msg_defer_to_thread(self, channel, func, *args):
+    def func_defer_to_thread(self, channel, func, *args):
         """returns deferred result of func as message to given channel (using deferToThread)"""
-        dt = threads.deferToThread(func, *args)
-        dt.addCallback(self._deferred_msg_cb, channel)
-        dt.addErrback(self._deferred_msg_err, channel)
-
-    def _deferred_msg_cb(self, result, channel):
-        self.msg(channel, str(result))
-
-    def _deferred_msg_err(self, err, channel):
-        self.msg(channel, 'error! %s' % err)
+        d = threads.deferToThread(func, *args)
+        d.addCallback(lambda result: self.msg(channel, str(result)))
+        d.addErrback(lambda err: self.msg(channel, err))
 
 ### twisted protocol/factory ###
 class ChiiBot(irc.IRCClient, Chii):
