@@ -4,7 +4,7 @@ import inspect
 
 # utilities
 @command(restrict='admins')
-def args(self, nick, host, channel, *args):
+def args(self, channel, nick, host, *args):
     """prints arguments for a function/method"""
     argspec = inspect.getargspec(eval(args[0]))
     args = ['\002%s\002: %s' % (x, ' '.join(getattr(argspec, x)))
@@ -14,7 +14,7 @@ def args(self, nick, host, channel, *args):
         self.msg(channel, arg)
 
 @command('exec', restrict='admins')
-def evil_exec(self, nick, host, channel, *args):
+def evil_exec(self, channel, nick, host, *args):
     """u don't know me"""
     if args:
         from twisted.python import log
@@ -37,7 +37,7 @@ def evil_exec(self, nick, host, channel, *args):
         return logged
 
 @command('eval', restrict='admins')
-def evil_eval(self, nick, host, channel, *args):
+def evil_eval(self, channel, nick, host, *args):
     """u don't know me"""
     if args:
         return str(eval(' '.join(args)))

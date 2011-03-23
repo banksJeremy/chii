@@ -8,7 +8,7 @@ def get_random(items):
     return items[index]
 
 @command
-def face(self, nick, host, channel, *args):
+def face(self, channel, nick, host, *args):
     """you need help with your face?"""
     if args:
         args = ' '.join(args).split('+')
@@ -20,12 +20,12 @@ def face(self, nick, host, channel, *args):
     return 'hahah your face'
 
 @command
-def sheen(self, nick, host, channel, *args):
+def sheen(self, channel, nick, host, *args):
     """well why not"""
     return '\002I GOT TIGER BLOOD IN ME %s' % nick.upper()
 
 @command
-def neoblaze(self, nick, host, channel, *args):
+def neoblaze(self, channel, nick, host, *args):
     """well why not"""
     for i in range( int(random.random()*5) ):
         self.msg(channel, 'np: Pendulum - Propane Nightmares (5:13)')
@@ -33,7 +33,7 @@ def neoblaze(self, nick, host, channel, *args):
         self.msg(channel, 'DUDU'*int(random.random()*20))
 
 @command
-def lambchops(self, nick, host, channel, *args):
+def lambchops(self, channel, nick, host, *args):
     """THIS IS THE..."""
     SONG_THAT_NEVER_ENDS = [
         "THIS IS THE SONG THAT DOESN'T END",
@@ -45,7 +45,7 @@ def lambchops(self, nick, host, channel, *args):
         self.msg(channel, line)
 
 @command
-def pat(self, nick, host, channel, *args):
+def pat(self, channel, nick, host, *args):
     """because i am a good bot!"""
     if host.endswith('vf.shawcable.net'):
         pats = 'pat ' * int(random.random()*5)
@@ -54,7 +54,7 @@ def pat(self, nick, host, channel, *args):
         self.me(channel, 'leg twitches, and looks at you happily')
 
 @command
-def last(self, nick, host, channel, *args):
+def last(self, channel, nick, host, *args):
     """that last bit was quite funny!"""
     def get_line(f, size):
         while True:
@@ -75,12 +75,12 @@ def last(self, nick, host, channel, *args):
         return 'not logging, I have no fucking clue what happened 2 seconds ago'
 
 @command
-def halp(self, nick, host, channel, *args):
+def halp(self, channel, nick, host, *args):
     """bunny said ^"""
     return 'halp halp halp!'
 
 @command
-def haha(self, nick, host, channel, *args):
+def haha(self, channel, nick, host, *args):
     """sometimes i get giggly"""
     laughter = [
         'hahah',
@@ -101,7 +101,7 @@ def haha(self, nick, host, channel, *args):
     return haha
 
 @command
-def bonghits(self, nick, host, channel, *args):
+def bonghits(self, channel, nick, host, *args):
     """what? huh? sorry i'm a little high"""
     interjections = ['\002cough\002', '...', 'hehe', '    mmm', 'hahah',
                      '\002inhaling\002', '\002random noises\002', 'hey man',
@@ -118,7 +118,7 @@ def bonghits(self, nick, host, channel, *args):
 
 
 @command
-def directions(self, nick, host, channel, *args):
+def directions(self, channel, nick, host, *args):
     """try from -> to, now get lost"""
     url = 'http://www.mapquest.com/?le=t&q1=%s&q2=%s&maptype=map&vs=directions'
     if '->' not in args:
@@ -129,7 +129,7 @@ def directions(self, nick, host, channel, *args):
 
 if IMGUR_API_KEY:
     @command
-    def imgur(self, nick, host, channel, *args):
+    def imgur(self, channel, nick, host, *args):
         """<densy> this mode is full of fail"""
         url = 'http://api.imgur.com/2/stats.json'
         request = urllib2.Request(url, None, {'key': IMGUR_API_KEY})

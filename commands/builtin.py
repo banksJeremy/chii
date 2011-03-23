@@ -1,7 +1,7 @@
 from chii import command
 
 @command(restrict='admins')
-def config(self, nick, host, channel, *args):
+def config(self, channel, nick, host, *args):
     """Call without arguments to list. Call with save to save configuration. Set with key = value"""
     def list(args):
         config = self.config.defaults.copy()
@@ -37,14 +37,14 @@ def config(self, nick, host, channel, *args):
     return dispatch(args)
 
 @command(restrict='admins')
-def rehash(self, nick, host, channel, *args):
+def rehash(self, channel, nick, host, *args):
     """u don't know me"""
     self._update_registry()
     self._handle_event('load')
     return '\002rehash !!\002 rehashed'
 
 @command
-def help(self, nick, host, channel, command=None, *args):
+def help(self, channel, nick, host, command=None, *args):
     """returns help nogga"""
     commands = filter(lambda x: self.commands[x]._restrict is None, self.commands)
     for role in self.config['user_roles']:
@@ -60,22 +60,22 @@ def help(self, nick, host, channel, command=None, *args):
     return '\002help ?? available commands\002 >> %s' % ', '.join(sorted(commands))
 
 @command
-def say(self, nick, host, channel, *args):
+def say(self, channel, nick, host, *args):
     """SAY SMTH ELSE"""
     self.msg(channel, ' '.join(args))
 
 @command
-def me(self, nick, host, channel, *args):
+def me(self, channel, nick, host, *args):
     """strike a pose"""
     self.me(channel, ' '.join(args))
 
 @command
-def topic(self, nick, host, channel, *args):
+def topic(self, channel, nick, host, *args):
     """how 2 make babby"""
     self.topic(channel, ' '.join(args))
 
 @command(restrict='admins')
-def mode(self, nick, host, channel, *args):
+def mode(self, channel, nick, host, *args):
     """change the game"""
     new_mode = 'MODE %s' % ' '.join(args)
     self.sendLine(new_mode)

@@ -16,7 +16,7 @@ if GOOGLE_API_KEY:
 
     def build_search(api):
         @command(*api['aliases'])
-        def search(self, nick, host, channel, *args):
+        def search(self, channel, nick, host, *args):
             if args:
                 query = '%20'.join(args)
             else:
@@ -44,7 +44,7 @@ if GOOGLE_API_KEY:
         return ' '.join((msg, url))
 
     @command('gt', 'translate')
-    def google_translate(self, nick, host, channel, language_pair=None, *args):
+    def google_translate(self, channel, nick, host, language_pair=None, *args):
         """so kawaii"""
         if not args or not language_pair:
             return 'u need something to translate!'

@@ -19,8 +19,20 @@ def build_lambda(args):
     func_s = 'lambda nick, host, channel, %s: %s' % (args, body)
     return func_s, name
 
-@command('lambda', 'def')
-def lambda_command(self, nick, host, channel, *args):
+def wrap_lambda(func, func_s, nick):
+    """returns our wrapped lambda"""
+    def wrapped_lambda(channel, nick, host, *args):
+        try:
+            args = eval(' '.join(args) + ',') 
+        except:
+            pass
+        return str(func(channel, nick, host, *args))
+    wrapped_lambda.__doc__ = "lambda function added by \002%s\002. %s" % (nick, func_s)
+    wrapped_lambda._restrict = None
+    return wrapped_lambda
+
+@command('lambda')
+def lambda_command(self, channel, nick, host, *args):
     """add new functions to the bot using python lambda functions"""
     def list_lambda(nick, args):
         lambdas = self.config['lambdas']
@@ -52,17 +64,7 @@ def lambda_command(self, nick, host, channel, *args):
                 self.config['lambdas'] = {}
             self.config['lambdas'][name] = [func_s, nick]
             self.config.save()
-        # build wrapper for our lambda
-        def lambda_wrapper(nick, host, channel, *args):
-            try:
-                args = eval(' '.join(args) + ',')
-            except:
-                pass
-            return str(func(nick, host, channel, *args))
-        # save lambda command into our command registry
-        lambda_wrapper.__doc__ = "lambda function added by \002%s\002. %s" % (nick, func_s)
-        lambda_wrapper._restrict = None
-        self.commands[name] = lambda_wrapper
+        self.commands[name] = wrapped_lambda(func, func_s, nick)
         return 'added new lambda function to commands as %s' % name
 
     dispatch = {
@@ -90,15 +92,5 @@ if PERSIST and SAVED_LAMBDAS:
             except Exception as e:
                 print 'not a valid lambda function: %s' % e
                 break
-            # build wrapper for our lambda
-            def lambda_wrapper(nick, host, channel, *args):
-                try:
-                    args = eval(' '.join(args) + ',') 
-                except:
-                    pass
-                return str(func(nick, host, channel, *args))
-            # save lambda command into our command registry
-            lambda_wrapper.__doc__ = "lambda function added by \002%s\002. %s" % (nick, func_s)
-            lambda_wrapper._restrict = None
-            self.commands[name] = lambda_wrapper
+            self.commands[name] = wrapped_lambda(func, fund_s, nick)
             print 'added new lambda function to commands as %s' % name

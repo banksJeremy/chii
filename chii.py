@@ -230,7 +230,7 @@ class Chii:
             print '[events]', ': '.join(sorted(x + ': ' + ', '.join(sorted(y.__name__ for y in self.events[x])) for x in self.events))
             print '[tasks]', ', '.join(sorted(x for x in self.tasks))
 
-    def _handle_command(self, nick, host, channel, msg):
+    def _handle_command(self, channel, nick, host, msg):
         """Handles commands, passing them proper args, etc"""
         msg = msg.split()
         command, args = msg[0][1:].lower(), []
@@ -240,32 +240,27 @@ class Chii:
                 if len(msg) > 1:
                     args = msg[1:]
                 try:
-                    response = command(nick, host, channel, *args)
+                    response = command(channel, nick, host, *args)
                 except Exception as e:
                     response = 'ur shit am fuked! %s' % e
                     traceback.print_exc()
                 if response:
-                    if channel == self.nickname:
-                        self.msg(nick, response)
-                    else:
-                        self.msg(channel, response)
+                    self.msg(channel, response)
                     self.logger.log("<%s> %s" % (self.nickname, response))
 
 
-    def _handle_event(self, event_type=None, respond=False, *args):
+    def _handle_event(self, event_type, respond_to=None, *args):
         """Handles event and catches errors, returns result of event as bot message"""
-        events = self.events.get(event_type, None)
-        if events:
-            for event in events:
-                try:
-                    response = event(*args)
-                except Exception as e:
-                    response = 'ur shit am fuked! %s' % e
-                    traceback.print_exc()
-                if respond and response:
-                    # only return something if this event is caught in a channel
-                    self.msg(respond, response)
-                    self.logger.log("<%s> %s" % (self.nickname, response))
+        for event in self.events[event_type]:
+            try:
+                response = event(*args)
+            except Exception as e:
+                response = 'ur shit am fuked! %s' % e
+                traceback.print_exc()
+            if response and respond_to:
+                # only return something if this event is caught in a channel
+                self.msg(respond_to, response)
+                self.logger.log("<%s> %s" % (self.nickname, response))
 
     def check_permission(self, restrict_to, nick, host):
         if restrict_to is None:
@@ -314,7 +309,7 @@ class ChiiBot(irc.IRCClient, Chii):
         irc.IRCClient.connectionMade(self)
         self.logger.log("[connected at %s]" % time.asctime(time.localtime(time.time())))
         self._update_registry()
-        self._handle_event('load', False)
+        self._handle_event('load')
 
     def connectionLost(self, reason):
         irc.IRCClient.connectionLost(self, reason)
@@ -339,15 +334,16 @@ class ChiiBot(irc.IRCClient, Chii):
         self.logger.log("<%s> %s" % (nick, msg))
 
         # handle message events
-        self._handle_event('msg', channel, nick, host, channel, msg)
         if channel == self.nickname:
-            self._handle_event('pubmsg', channel, nick, host, channel, msg)
+            channel = nick # there is no channel, so set channel to nick so response goes some place (if there is one)
+            self._handle_event('privmsg', respond_to=channel, channel, nick, host, msg)
         else:
-            self._handle_event('pubmsg', channel, nick, host, channel, msg)
+            self._handle_event('pubmsg', respond_to=channel, channel, nick, host, msg)
+        self._handle_event('msg', respond_to=channel, channel, nick, host, msg)
 
         # Check if we're getting a command
         if msg.startswith(self.config['cmd_prefix']):
-            self._handle_command(nick, host, channel, msg)
+            self._handle_command(channel, nick, host, msg)
 
     def action(self, user, channel, msg):
         """This will get called when the bot sees someone do an action."""

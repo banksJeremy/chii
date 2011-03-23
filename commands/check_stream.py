@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from twisted.protocols import shoutcast
 from twisted.internet import protocol, reactor
 
