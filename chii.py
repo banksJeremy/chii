@@ -270,13 +270,13 @@ class Chii:
                 return True
         return False
 
-    def msg_Deferred(self, channel, func, *args):
+    def msg_defer(self, channel, func, *args):
         """returns deferred result of func as message to given channel"""
         d = defer.Deferred(func, *args)
         d.addCallback(self._deferred_msg_cb, channel)
         d.addCallback(self._deferred_msg_err, channel)
 
-    def msg_deferToThread(self, channel, func, *args):
+    def msg_defer_to_thread(self, channel, func, *args):
         """returns deferred result of func as message to given channel (using deferToThread)"""
         dt = threads.deferToThread(func, *args)
         dt.addCallback(self._deferred_msg_cb, channel)
@@ -287,7 +287,6 @@ class Chii:
 
     def _deferred_msg_err(self, err, channel):
         self.msg(channel, 'error! %s' % err)
-
 
 ### twisted protocol/factory ###
 class ChiiBot(irc.IRCClient, Chii):
@@ -336,10 +335,10 @@ class ChiiBot(irc.IRCClient, Chii):
         # handle message events
         if channel == self.nickname:
             channel = nick # there is no channel, so set channel to nick so response goes some place (if there is one)
-            self._handle_event('privmsg', respond_to=channel, channel, nick, host, msg)
+            self._handle_event('privmsg', channel, channel, nick, host, msg)
         else:
-            self._handle_event('pubmsg', respond_to=channel, channel, nick, host, msg)
-        self._handle_event('msg', respond_to=channel, channel, nick, host, msg)
+            self._handle_event('pubmsg', channel, channel, nick, host, msg)
+        self._handle_event('msg', channel, channel, nick, host, msg)
 
         # Check if we're getting a command
         if msg.startswith(self.config['cmd_prefix']):

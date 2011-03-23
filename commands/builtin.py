@@ -54,10 +54,18 @@ def help(self, channel, nick, host, command=None, *args):
     if command in commands:
         method = self.commands[command]
         if method.__doc__:
-            help_msg = method.__doc__.strip().split('\n')[0]
-            return '\002help ?? %s\002 >> %s' % (command, help_msg)
-        return '\002help ??\002 eh wut'
-    return '\002help ?? available commands\002 >> %s' % ', '.join(sorted(commands))
+            help_msg = method.__doc__.strip().split('\n')
+            self.msg(channel, '\002help ?? %s\002 >> %s' % (command, help_msg[0]))
+            if len(help_msg) > 1:
+                for line in help_msg[1:]:
+                    if line == '':
+                        break
+                    else:
+                        self.msg(channel, line)
+        else:
+            return '\002help ??\002 eh wut'
+    else:
+        return '\002help ?? available commands\002 >> %s' % ', '.join(sorted(commands))
 
 @command
 def say(self, channel, nick, host, *args):

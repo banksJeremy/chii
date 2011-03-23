@@ -1,14 +1,59 @@
 from chii import command, config, event
-import random, urllib, yaml, json
 
 PERSIST = config['lambda_persist']
 SAVED_LAMBDAS = config['lambdas']
+HELPER_FUNCS = config['lambda_helpers']
 
 # block dangerous stuff:
 DANGEROUS = (execfile, file, open, __import__, __file__, __builtins__, __package__, __name__, locals, vars, globals, input, raw_input)
 for x in DANGEROUS:
     x = None
 
+if HELPER_FUNCS:
+    import random
+    # funcs available to lambda
+    def rand(choices=None):
+        """wrapper for random, to make it a bit easier to use common functions from lambdas"""
+        if choices is None:
+            return random.random()
+        elif type(choices) is int:
+            return int(random.random()*choices)
+        elif hasattr(choices, '__iter__'):
+            return random.choice(choices)
+        else:
+            return 'wtf mang'
+
+    try:
+        import httplib2
+        h = httplib2.Http('.cache')
+
+        def get(url):
+            return h.request(url, 'GET')[1]
+
+        def head(url):
+            return h.request(url, 'GET')[0]
+    except:
+        import urllib2
+        def get(url):
+            request = urllib2.Request(url, None, {'Referer': 'http://quoth.notune.com'})
+            return urllib2.urlopen(request)
+    
+    def json_get(url):
+        return json.load(get(url))
+    
+    try:
+        import yaml
+        def yaml_get(url):
+            return yaml.load(get(url))
+    except:
+        pass
+
+    try:
+        from BeautifulSoup import BeautifulSoup as bs
+    except:
+        pass
+
+# actually handle adding/loading/removing/etc lambdas
 def build_lambda(args):
     """Returns name and lambda function as strings"""
     name, body = ' '.join(args).split(':', 1)
@@ -16,10 +61,10 @@ def build_lambda(args):
         name, args = name[:-1].split('(', 1)
     else:
         args = '*args'
-    func_s = 'lambda nick, host, channel, %s: %s' % (args, body)
+    func_s = 'lambda channel, nick, host, %s: %s' % (args, body)
     return func_s, name
 
-def wrap_lambda(func, func_s, nick):
+def wrap_lambda(func, func_s, name, nick):
     """returns our wrapped lambda"""
     def wrapped_lambda(channel, nick, host, *args):
         try:
@@ -27,7 +72,8 @@ def wrap_lambda(func, func_s, nick):
         except:
             pass
         return str(func(channel, nick, host, *args))
-    wrapped_lambda.__doc__ = "lambda function added by \002%s\002. %s" % (nick, func_s)
+    help_def = func_s.replace('channel, nick, host, ', '')
+    wrapped_lambda.__doc__ = "lambda function added by \002%s\002\n%s = %s" % (nick, name, help_def)
     wrapped_lambda._restrict = None
     return wrapped_lambda
 
@@ -42,8 +88,9 @@ def lambda_command(self, channel, nick, host, *args):
             return 'no lambdas found'
 
     def del_lambda(nick, args):
-        name = args[0]
-        del self.config[lambdas][name]        
+        name = args[1]
+        del self.config['lambdas'][name]
+        self.config.save()
         return 'deleted %s' % name
 
     def add_lambda(nick, args):
@@ -64,7 +111,7 @@ def lambda_command(self, channel, nick, host, *args):
                 self.config['lambdas'] = {}
             self.config['lambdas'][name] = [func_s, nick]
             self.config.save()
-        self.commands[name] = wrapped_lambda(func, func_s, nick)
+        self.commands[name] = wrap_lambda(func, func_s, name, nick)
         return 'added new lambda function to commands as %s' % name
 
     dispatch = {
@@ -92,5 +139,5 @@ if PERSIST and SAVED_LAMBDAS:
             except Exception as e:
                 print 'not a valid lambda function: %s' % e
                 break
-            self.commands[name] = wrapped_lambda(func, fund_s, nick)
+            self.commands[name] = wrap_lambda(func, func_s, name, nick)
             print 'added new lambda function to commands as %s' % name
