@@ -235,7 +235,7 @@ class ChiiBot:
                         if mod:
                             self._add_to_registry(mod)
             print '[commands]', ', '.join(sorted(x for x in self.commands))
-            print '[events]', ':'.join(sorted(x + ', ' + ', '.join(sorted(y.__name__ for y in self.events[x])) for x in self.events))
+            print '[events]', ' '.join(sorted(x + ': ' + ', '.join(sorted(y.__name__ for y in self.events[x])) for x in self.events))
             print '[tasks]', ', '.join(sorted(x for x in self.tasks))
 
     # command, event task methods that execute specify commands for given behavior
