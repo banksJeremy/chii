@@ -12,7 +12,7 @@ import yaml
 ### config ###
 CONFIG_FILE = 'bot.config'
 
-class Config(dict):
+class ChiiConfig(dict):
     """Handles all configuration for chii. Reads/writes from/to YAML.
        Acts like a normal dict, except returns default value or None
        for non-existant keys."""
@@ -52,7 +52,7 @@ class Config(dict):
 
     def __getitem__(self, key):
         if self.__contains__(key):
-            return super(Config, self).__getitem__(key)
+            return super(ChiiConfig, self).__getitem__(key)
         elif key in self.defaults:
             return self.defaults[key]
 
@@ -65,9 +65,6 @@ class Config(dict):
         f = open(self.file, 'w')
         f.write(yaml.dump(dict((key, self.defaults[key]) for key in sorted(self.defaults)), default_flow_style=False))
         f.close()
-
-# get config
-config = Config(CONFIG_FILE)
 
 ### decorators ###
 def command(*args, **kwargs):
@@ -133,7 +130,7 @@ def task(repeat, scale=None):
     return decorator
 
 ### application logic ###
-class Logger:
+class ChiiLogger:
     """Logs both irc events and chii events into different log files"""
     def __init__(self, logs_dir, channels, nickname):
         if os.path.isdir(logs_dir):
@@ -397,23 +394,12 @@ class Chii:
 
 ### twisted protocol/factory ###
 class ChiiBot(irc.IRCClient, Chii):
-    config = config
-    nickname = config['nickname']
-    realname = config['realname']
-
-    # setup logging
-    log_args = [None, None, None]
-    if config['logs_dir']:
-        log_args[0] = config['logs_dir']
-        if config['log_channels']:
-            log_args[1] = config['channels']
-        if config['log_chii']:
-            log_args[2] = nickname
-    logger = Logger(*log_args)
-
+    """a very peculiar bot"""
     def connectionMade(self):
-        irc.IRCClient.connectionMade(self)
         self.logger.log("[connected at %s]" % time.asctime(time.localtime(time.time())))
+        irc.IRCClient.connectionMade(self)
+
+        # update list of commands, events, tasks, and start tasks
         self._update_registry()
         self._handle_event('load')
         self._start_tasks()
@@ -552,7 +538,8 @@ class ChiiBot(irc.IRCClient, Chii):
 
 class ChiiFactory(protocol.ClientFactory):
     """A factory for ChiiBots."""
-    protocol = ChiiBot
+    def __init__(self, protocol):
+        self.protocol = protocol
 
     def clientConnectionLost(self, connector, reason):
         """If we get disconnected, reconnect to server."""
@@ -562,6 +549,9 @@ class ChiiFactory(protocol.ClientFactory):
         print "connection failed:", reason
         reactor.stop()
 
+
+config = ChiiConfig(CONFIG_FILE)
+
 ### main ###
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='simple python bot')
@@ -570,7 +560,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.config:
-        config = Config(args.config)
+        config = ChiiConfig(args.config)
 
     if args.save_defaults:
         config.save_defaults()
@@ -585,8 +575,23 @@ if __name__ == '__main__':
     if config['log_stdout']:
         log.startLogging(sys.stdout)
 
-    # create factory protocol and application
-    factory = ChiiFactory()
+    # setup our protocol & factory
+    ChiiBot.config = config
+    ChiiBot.nickname = config['nickname']
+    ChiiBot.realname = config['realname']
+
+    # setup logging
+    if config['logs_dir']:
+        log_args = [config['logs_dir'], None, None]
+        if config['log_channels']:
+            log_args[1] = config['channels']
+        if config['log_chii']:
+            log_args[2] = config['nickname']
+        ChiiBot.logger = ChiiLogger(*log_args)
+    else:
+        ChiiBot.logger = lambda *args: None
+
+    factory = ChiiFactory(ChiiBot)
 
     # connect factory to this host and port
     if config['ssl']:

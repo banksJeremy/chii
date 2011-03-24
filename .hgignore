@@ -8,3 +8,7 @@ bot.config
 **.DS_Store
 **.log
 commands/muse.py
+local/**
+old/**
+logs/**
+brain.txt
