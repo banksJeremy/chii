@@ -30,6 +30,7 @@ class ChiiConfig(dict):
         'user_roles': {'admins': ['zk!is@whatit.is']},
         'logs_dir': '',
         'log_channels': False,
+        'log_privmsg': False,
         'log_chii': False,
         'log_stdout': True,
         'disabled_modules': [],
@@ -137,6 +138,7 @@ class ChiiLogger:
         self.logs_dir = config['logs_dir']
         self.channel_logs = {}
         self.chii_log = None
+        self.log_privmsg = False
 
         if self.logs_dir:
             if os.path.isdir(self.logs_dir):
@@ -146,14 +148,26 @@ class ChiiLogger:
                     self.chii_log = open(os.path.join(self.logs_dir, config['nickname'] + '.log'), 'a')
                     self.observer = log.FileLogObserver(self.chii_log)
                     self.observer.start()
+                if config['log_privmsg']:
+                    self.log_privmsg = True
+        else:
+            self.log = self.close = lambda *args: None
 
     def log(self, message, channel=None):
         """Write a message to the file."""
-        if channel and self.channel_logs:
-            file = self.channels[channel]
-            timestamp = time.strftime("[%H:%M:%S]", time.localtime(time.time()))
-            file.write('%s %s\n' % (timestamp, message))
-            file.flush()
+        if channel:
+            if channel.startswith('#'):
+                channel = channel[1:]
+            if channel in self.channel_logs:
+                file = self.channels[channel]
+                timestamp = time.strftime("[%H:%M:%S]", time.localtime(time.time()))
+                file.write('%s %s\n' % (timestamp, message))
+                file.flush()
+            elif self.log_privmsg:
+                file = open(os.path.join(self.logs_dir, channel + '.log'), 'a')
+                timestamp = time.strftime("[%H:%M:%S]", time.localtime(time.time()))
+                file.write('%s %s\n' % (timestamp, message))
+                file.close()
 
     def close(self):
         if self.chii_log:
@@ -252,7 +266,7 @@ class ChiiBot:
             traceback.print_exc()
         if response:
             self.msg(channel, response)
-            self.logger.log("<%s> %s" % (self.nickname, response))
+            self.logger.log("<%s> %s" % (self.nickname, response), channel)
 
     def _event(self, event, args=(), respond_to=False):
         """executes an event"""
@@ -264,7 +278,7 @@ class ChiiBot:
         if response and respond_to:
             # only return something if this event is caught in a channel
             self.msg(respond_to, response)
-            self.logger.log("<%s> %s" % (self.nickname, response))
+            self.logger.log("<%s> %s" % (self.nickname, response), channel)
 
     def _task(self, name, func, repeat=60, scale=None):
         """executes looping task"""
@@ -437,12 +451,11 @@ class ChiiProto(irc.IRCClient, ChiiBot):
 
     def joined(self, channel):
         """This will get called when the bot joins a channel."""
-        self.logger.log("[I have joined %s]" % channel)
+        self.logger.log("[I have joined %s]" % channel, channel)
 
     def privmsg(self, user, channel, msg):
         """This will get called when the bot receives a message."""
         nick, host = user.split('!')
-        self.logger.log("<%s> %s" % (nick, msg))
 
         # handle message events
         if channel == self.nickname:
@@ -456,11 +469,18 @@ class ChiiProto(irc.IRCClient, ChiiBot):
         if msg.startswith(self.config['cmd_prefix']):
             self._handle_command(channel, nick, host, msg)
 
+        # logs
+        self.logger.log("<%s> %s" % (nick, msg), channel)
+
     def action(self, user, channel, msg):
         """This will get called when the bot sees someone do an action."""
         nick, host = user.split('!')
         self._handle_event('action', channel, channel, nick, host, msg)
-        self.logger.log("* %s %s" % (nick, msg))
+
+        if channel == self.nickname:
+            self.logger.log("* %s %s" % (nick, msg), nick)
+        else:
+            self.logger.log("* %s %s" % (nick, msg), channel)
 
     def userJoined(self, user, channel):
         """Called when I see another user joining a channel."""
