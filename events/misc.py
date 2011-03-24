@@ -1,12 +1,12 @@
 from chii import event
 
 @event('action')
-def haha(self, nick, host, channel, action):
+def trout(self, nick, host, channel, action):
     if 'trout' in action:
         self.me(channel, 'slaps %s around with a large carp' % nick)
 
 @event('msg')
-def haha(self, nick, host, channel, msg):
+def the_best(self, nick, host, channel, msg):
     if (msg.startswith('who is') or msg.startswith('who the')) and (msg.endswith('best?') or msg.endswith('best')):
         if self.config['owner'] in '!'.join((nick, host)):
             if msg.startswith('who the'):

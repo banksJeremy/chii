@@ -6,6 +6,7 @@ def config(self, channel, nick, host, *args):
     def list(args):
         config = self.config.defaults.copy()
         config.update(self.config)
+        del config['lambdas'] # filter out lambdas
         return ' '.join('\002%s\002: %s' % (x[0], str(x[1])) for x in config.iteritems())
 
     def show(args):

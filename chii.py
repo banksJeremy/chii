@@ -20,6 +20,7 @@ class ChiiConfig(dict):
     defaults = {
         'nickname': 'chii',
         'realname': 'chii',
+        'ident_pass': None,
         'server': 'irc.esper.net',
         'port': 6667,
         'channels': ['chiisadventure'],
@@ -27,8 +28,8 @@ class ChiiConfig(dict):
         'modules': ['commands', 'events', 'tasks'],
         'owner': 'zk!is@whatit.is',
         'user_roles': {'admins': ['zk!is@whatit.is']},
-        'logs_dir': 'logs',
-        'log_channels': True,
+        'logs_dir': '',
+        'log_channels': False,
         'log_chii': False,
         'log_stdout': True,
         'disabled_modules': [],
@@ -132,39 +133,37 @@ def task(repeat, scale=None):
 ### application logic ###
 class ChiiLogger:
     """Logs both irc events and chii events into different log files"""
-    def __init__(self, logs_dir, channels, nickname):
-        if os.path.isdir(logs_dir):
-            if channels:
-                self.channels = dict(((channel, open(os.path.join(logs_dir, channel +'.log'), 'a')) for channel in channels))
-            else:
-                self.channels = {}
-                self.log = lambda *args: None
-            if nickname:
-                self.bot_log = open(os.path.join(logs_dir, nickname + '.log'), 'a')
-                self.observer = log.FileLogObserver(self.bot_log)
-                self.observer.start()
-            else:
-                self.nickname = None
+    def __init__(self, config):
+        self.logs_dir = None
+        self.channel_logs = {}
+        self.chii_log = None
+
+        if config['logs_dir']:
+            if os.path.isdir(logs_dir):
+                self.logs_dir = config['logs_dir']
+                if config['log_channels']:
+                    self.channel_logs = dict(((channel, open(os.path.join(logs_dir, channel +'.log'), 'a')) for channel in config['channels']))
+                if config['log_chii']:
+                    self.chii_log = open(os.path.join(self.logs_dir, config['nickname'] + '.log'), 'a')
+                    self.observer = log.FileLogObserver(self.chii_log)
+                    self.observer.start()
 
     def log(self, message, channel=None):
         """Write a message to the file."""
-        if channel:
-            logfiles = [self.channels['channel']]
-        else:
-            logfiles = self.channels.values()
-        for file in logfiles:
+        if channel and self.channel_logs:
+            file = self.channels[channel]
             timestamp = time.strftime("[%H:%M:%S]", time.localtime(time.time()))
             file.write('%s %s\n' % (timestamp, message))
             file.flush()
 
     def close(self):
-        if self.nickname:
+        if self.chii_log:
             self.observer.stop()
-            self.bot_log.close()
-        for channel in self.channels:
-            self.channels[channel].close()
+            self.chii_log.close()
+        for channel in self.channel_logs.values():
+            channel.close()
 
-class Chii:
+class ChiiBot:
     """what makes chii, chii"""
     def _add_command(self, method):
         """add new instance method to self.commands"""
@@ -172,17 +171,17 @@ class Chii:
             for name in method._command_names:
                 if name in self.commands:
                     print 'Warning! commands registry already contains %s' % name
-                self.commands[name] = new.instancemethod(method, self, Chii)
+                self.commands[name] = new.instancemethod(method, self, ChiiBot)
 
     def _add_event(self, method):
         """add new instance method to self.events"""
         if method.__name__ not in self.config['disabled_events']:
-            self.events[method._event_type].add(new.instancemethod(method, self, Chii))
+            self.events[method._event_type].add(new.instancemethod(method, self, ChiiBot))
 
     def _add_task(self, method):
         """add new instance method to self.tasks"""
         if method.__name__ not in self.config['disabled_tasks']:
-            self.tasks[method.__name__] = (new.instancemethod(method, self, Chii), method._task_repeat, method._task_scale)
+            self.tasks[method.__name__] = (new.instancemethod(method, self, ChiiBot), method._task_repeat, method._task_scale)
 
     def _add_to_registry(self, mod):
         """Adds registred methods to registry"""
@@ -194,8 +193,10 @@ class Chii:
 
     def _import_module(self, package, module):
         """imports, reloading if neccessary given package.module"""
-        path = '%s.%s' % (package, module)
-
+        if package:
+            path = '%s.%s' % (package, module)
+        else:
+            path = module
         # cleanup if we're reloading
         if path in sys.modules:
             print 'Reloading', path
@@ -223,9 +224,12 @@ class Chii:
             self.tasks = {}
             self.running_tasks = {}
             for path in paths:
-                path = os.path.abspath(path)
-                package = os.path.split(path)[-1]
-                modules = [f.replace('.py', '') for f in os.listdir(path) if f.endswith('.py') and f != '__init__.py']
+                if os.path.isdir(path):
+                    package = os.path.basename(path)
+                    modules = [f.replace('.py', '') for f in os.listdir(path) if f.endswith('.py') and f != '__init__.py']
+                else:
+                    package = None
+                    modules = [path]
                 for module in modules:
                     if module not in config['disabled_modules']:
                         mod = self._import_module(package, module)
@@ -393,7 +397,7 @@ class Chii:
 
 
 ### twisted protocol/factory ###
-class ChiiBot(irc.IRCClient, Chii):
+class ChiiProto(irc.IRCClient, ChiiBot):
     """a very peculiar bot"""
     def connectionMade(self):
         self.logger.log("[connected at %s]" % time.asctime(time.localtime(time.time())))
@@ -538,8 +542,8 @@ class ChiiBot(irc.IRCClient, Chii):
 
 class ChiiFactory(protocol.ClientFactory):
     """A factory for ChiiBots."""
-    def __init__(self, protocol):
-        self.protocol = protocol
+    def __init__(self, chii):
+        self.protocol = chii
 
     def clientConnectionLost(self, connector, reason):
         """If we get disconnected, reconnect to server."""
@@ -576,22 +580,15 @@ if __name__ == '__main__':
         log.startLogging(sys.stdout)
 
     # setup our protocol & factory
-    ChiiBot.config = config
-    ChiiBot.nickname = config['nickname']
-    ChiiBot.realname = config['realname']
+    ChiiProto.config = config
+    ChiiProto.nickname = config['nickname']
+    ChiiProto.realname = config['realname']
 
     # setup logging
-    if config['logs_dir']:
-        log_args = [config['logs_dir'], None, None]
-        if config['log_channels']:
-            log_args[1] = config['channels']
-        if config['log_chii']:
-            log_args[2] = config['nickname']
-        ChiiBot.logger = ChiiLogger(*log_args)
-    else:
-        ChiiBot.logger = lambda *args: None
+    ChiiProto.logger = ChiiLogger(config)
 
-    factory = ChiiFactory(ChiiBot)
+    # yaya make our chii
+    factory = ChiiFactory(ChiiProto)
 
     # connect factory to this host and port
     if config['ssl']:
@@ -602,6 +599,7 @@ if __name__ == '__main__':
         reactor.connectTCP(config['server'], config['port'], factory)
 
     # run bot
-    if config['theaded']:
-        reactor.suggestThreadPoolSize(4)
+    if config['threaded']:
+        thread_size = config['threads'] or 4
+        reactor.suggestThreadPoolSize(thread_size)
     reactor.run()

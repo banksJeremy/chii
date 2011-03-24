@@ -1,6 +1,6 @@
-from chii import config, event
+from chii import config, command
 
-BRAIN = config['markov_brain']
+BRAIN = config['retard_brain']
 CHATTINESS = 0
 WORD_COUNT = 10
 WORD_MAX = 1000
@@ -50,8 +50,9 @@ if BRAIN:
                 return self.generate_sentence(None)
             return sentence
 
-    @event('msg')
-    def markov(self, channel, nick, host, msg):
+    @command
+    def retard(self, channel, nick, host, *args):
+        msg = ' '.join(args)
         def clean_sentence(sentence):
             sentence = sentence.replace('"', '')
             if sentence[-1] in (',', ';'):
@@ -60,16 +61,9 @@ if BRAIN:
                 sentence += '.'
             return sentence.upper()
 
-        if self.nickname.lower() in msg.lower():
-            msg = re.compile(self.nickname + "[:,]* ?", re.I).sub('', msg)
-            prefix = "%s:" % nick
-        else:
-            prefix = ''
-
-        if prefix or random.random() <= CHATTINESS:
-            return prefix + clean_sentence(markov_chain.generate_sentence(msg))
-
+        prefix = "%s:" % nick
         markov_chain.add_to_brain(msg, write_to_file=True)
+        return prefix + clean_sentence(markov_chain.generate_sentence(msg))
 
     markov_chain = MarkovChain()
 
@@ -77,4 +71,4 @@ if BRAIN:
         with open(BRAIN) as f:
             for line in f.readlines():
                 markov_chain.add_to_brain(line)
-        print 'Brain Reloaded'
+        print 'Retard Brain Loaded'
