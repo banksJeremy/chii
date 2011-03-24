@@ -1,11 +1,12 @@
 try:
-    from megahal import *
+    import megahal
 except:
     megahal = None
 
 if megahal:
+    from megahal import *
     import os, random, re
-    from chii import event
+    from chii import config, event
 
     # get config or set defaults
     if config['megahal_brain']:

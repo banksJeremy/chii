@@ -134,15 +134,14 @@ def task(repeat, scale=None):
 class ChiiLogger:
     """Logs both irc events and chii events into different log files"""
     def __init__(self, config):
-        self.logs_dir = None
+        self.logs_dir = config['logs_dir']
         self.channel_logs = {}
         self.chii_log = None
 
-        if config['logs_dir']:
-            if os.path.isdir(logs_dir):
-                self.logs_dir = config['logs_dir']
+        if self.logs_dir:
+            if os.path.isdir(self.logs_dir):
                 if config['log_channels']:
-                    self.channel_logs = dict(((channel, open(os.path.join(logs_dir, channel +'.log'), 'a')) for channel in config['channels']))
+                    self.channel_logs = dict(((channel, open(os.path.join(self.logs_dir, channel +'.log'), 'a')) for channel in config['channels']))
                 if config['log_chii']:
                     self.chii_log = open(os.path.join(self.logs_dir, config['nickname'] + '.log'), 'a')
                     self.observer = log.FileLogObserver(self.chii_log)
