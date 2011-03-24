@@ -165,7 +165,7 @@ class ChiiLogger:
             self.channels[channel].close()
 
 class Chii:
-    """Application logic for our chiibot"""
+    """what makes chii, chii"""
     def _add_command(self, method):
         """add new instance method to self.commands"""
         if method.__name__ not in self.config['disabled_commands']:
@@ -549,7 +549,7 @@ class ChiiFactory(protocol.ClientFactory):
         print "connection failed:", reason
         reactor.stop()
 
-
+# we do this so we can easily import the config into our modules from here
 config = ChiiConfig(CONFIG_FILE)
 
 ### main ###
