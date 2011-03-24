@@ -30,8 +30,11 @@ def del_quote(self, channel, nick, host, *args):
 def quote(self, channel, nick, host, *args):
     """gets quotes from database random, by id, or search"""
     def rand():
-        q = Quote.objects.order_by('?')[0]
-        return str(q.quote)
+        q = Quote.objects.order_by('?')
+        if q:
+            return str(q[0].quote)
+        else:
+            return 'quote not found'
 
     def get_id(q_id):
         q = Quote.objects.get_or_none(id=q_id)
