@@ -141,15 +141,16 @@ class ChiiLogger:
         self.log_privmsg = False
 
         if self.logs_dir:
-            if os.path.isdir(self.logs_dir):
-                if config['log_channels']:
-                    self.channel_logs = dict(((channel, open(os.path.join(self.logs_dir, channel +'.log'), 'a')) for channel in config['channels']))
-                if config['log_chii']:
-                    self.chii_log = open(os.path.join(self.logs_dir, config['nickname'] + '.log'), 'a')
-                    self.observer = log.FileLogObserver(self.chii_log)
-                    self.observer.start()
-                if config['log_privmsg']:
-                    self.log_privmsg = True
+            if not os.path.isdir(self.logs_dir):
+                os.mkdir(self.logs_dir)
+            if config['log_channels']:
+                self.channel_logs = dict(((channel, open(os.path.join(self.logs_dir, channel +'.log'), 'a')) for channel in config['channels']))
+            if config['log_chii']:
+                self.chii_log = open(os.path.join(self.logs_dir, config['nickname'] + '.log'), 'a')
+                self.observer = log.FileLogObserver(self.chii_log)
+                self.observer.start()
+            if config['log_privmsg']:
+                self.log_privmsg = True
         else:
             self.log = self.close = lambda *args: None
 
