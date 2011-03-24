@@ -2,7 +2,6 @@ import os, datetime
 from chii import command
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'quoth.settings'
-
 from quoth.quotes.models import Quote
 
 @command('q+')
@@ -35,28 +34,23 @@ def quote(self, channel, nick, host, *args):
         return str(q.quote)
 
     def get_id(q_id):
-        try:
-            q = Quote.objects.get(id=q_id)
+        q = Quote.objects.get_or_none(id=q_id)
+        if q:
             return str(q.quote)
-        except:
+        else:
             return 'quote not found'
 
     def search(query):
-        try:
-            q = Quote.objects.filter(quote__icontains=query).order_by('?')[0]
-            return str(q.quote)
-        except:
+        q = Quote.objects.filter(quote__icontains=query).order_by('?')
+        if q:
+            return str(q[0].quote)
+        else:
             return 'quote not found'
 
     if args:
-        print args
         try:
-            q_id = int(args[0])
+            return get_id(int(args[0]))
         except:
-            q_id = None
-        if q_id:
-            return get_id(q_id)
-        else:
             return search(' '.join(args))
     else:
         return rand()
