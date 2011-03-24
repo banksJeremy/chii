@@ -46,11 +46,13 @@ def config(self, channel, nick, host, *args):
 @command(restrict='admins')
 def rehash(self, channel, nick, host, *args):
     """u don't know me"""
-    self._stop_tasks()
-    self._update_registry()
-    self._handle_event('load')
-    self._start_tasks()
+    self._rehash()
     return '\002rehash !!\002 rehashed'
+
+@command(restrict='admins')
+def quit(self, channel, nick, host, *args):
+    """u don't know me"""
+    self._quit()
 
 @command
 def help(self, channel, nick, host, command=None, *args):

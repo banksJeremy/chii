@@ -159,7 +159,7 @@ class ChiiLogger:
             if channel.startswith('#'):
                 channel = channel[1:]
             if channel in self.channel_logs:
-                file = self.channels[channel]
+                file = self.channel_logs[channel]
                 timestamp = time.strftime("[%H:%M:%S]", time.localtime(time.time()))
                 file.write('%s %s\n' % (timestamp, message))
                 file.flush()
@@ -407,6 +407,21 @@ class ChiiBot:
         m, s = divmod(remainder, 60)
         time = {d: 'days', h: 'hours', m: 'minutes', s: 'seconds'}
         return ' '.join(' '.join((str(x), time[x])) for x in (d, h, m, s) if x is not 0)
+
+    def _quit(self):
+        self._handle_event('quit')
+        self._stop_tasks()
+        self.factory.doStop()
+        self.quit()
+        reactor.callLater(1, self.logger.close, None)
+        reactor.callLater(1, reactor.stop, None)
+        reactor.stop()
+
+    def _rehash(self):
+        self._stop_tasks()
+        self._update_registry()
+        self._handle_event('load')
+        self._start_tasks()
 
 
 ### twisted protocol/factory ###
