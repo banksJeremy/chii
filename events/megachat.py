@@ -30,6 +30,10 @@ if megahal:
     
         if prefix or random.random() <= CHATTINESS:
             return prefix + megahal.get_reply(msg)
+        elif nick == 'ali':
+            return prefix + megahal.get_reply(msg)            
     
-        megahal.learn(msg)
+    @event('unload', 'quit')
+    def megaclose(self, *args):
         megahal.sync()
+        megahal.close()

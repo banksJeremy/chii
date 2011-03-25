@@ -105,13 +105,13 @@ def command(*args, **kwargs):
             wrapper._restrict = None
         return wrapper
 
-def event(event_type):
+def event(*event_types):
     """Decorator which adds callable to the event registry"""
     def decorator(func):
         def wrapper(*func_args, **func_kwargs):
             return func(*func_args, **func_kwargs)
         wrapper._registry = 'events'
-        wrapper._event_type = event_type
+        wrapper._event_types = event_types
         wrapper.__name__ = func.__name__
         wrapper.__doc__ = func.__doc__
         wrapper.__hash__ = lambda *args: zlib.crc32(func.__name__)
@@ -190,7 +190,8 @@ class ChiiBot:
     def _add_event(self, method):
         """add new instance method to self.events"""
         if method.__name__ not in self.config['disabled_events']:
-            self.events[method._event_type].add(new.instancemethod(method, self, ChiiBot))
+            for event in method._event_types:
+                self.events[event].add(new.instancemethod(method, self, ChiiBot))
 
     def _add_task(self, method):
         """add new instance method to self.tasks"""
@@ -409,25 +410,28 @@ class ChiiBot:
         time = {d: 'days', h: 'hours', m: 'minutes', s: 'seconds'}
         return ' '.join(' '.join((str(x), time[x])) for x in (d, h, m, s) if x is not 0)
 
-    def _quit(self):
-        self._handle_event('quit')
-        self._stop_tasks()
-        self.factory.doStop()
-        self.quit()
-        reactor.callLater(1, self.logger.close, None)
-        reactor.callLater(1, reactor.stop, None)
-        reactor.stop()
-
     def _rehash(self):
+        self._handle_event('unload')
         self._stop_tasks()
         self._update_registry()
         self._handle_event('load')
         self._start_tasks()
 
+    def _quit(self, message=None):
+        self._handle_event('quit')
+        self._stop_tasks()
+        self.factory.doStop()
+        self.quit(message)
+        reactor.callLater(1, self.logger.close, None)
+        reactor.callLater(1, reactor.stop, None)
+        reactor.stop()
+
 
 ### twisted protocol/factory ###
 class ChiiProto(irc.IRCClient, ChiiBot):
     """a very peculiar bot"""
+    _names_list = defaultdict(set)
+
     def connectionMade(self):
         self.logger.log("[connected at %s]" % time.asctime(time.localtime(time.time())))
         irc.IRCClient.connectionMade(self)
@@ -488,6 +492,7 @@ class ChiiProto(irc.IRCClient, ChiiBot):
         # logs
         self.logger.log("<%s> %s" % (nick, msg), channel)
 
+    # event callbacks
     def action(self, user, channel, msg):
         """This will get called when the bot sees someone do an action."""
         nick, host = user.split('!')
@@ -513,6 +518,18 @@ class ChiiProto(irc.IRCClient, ChiiBot):
     def userKicked(self, kickee, channel, kicker, message):
         """Called when I observe someone else being kicked from a channel."""
         pass
+
+    def _ping(self, user, message=None, channel=None):
+        if channel:
+            self._ping_called_from = channel
+        self.ping(user, message)
+
+    def pong(self, user, secs):
+        if hasattr(self, '_ping_called_from'):
+            channel = self._ping_called_from
+            if channel:
+                self.msg(channel, 'ping! reply from %s: %f seconds' % (user, secs))
+            del self._ping_called_from
 
     # irc callbacks
     def irc_NICK(self, prefix, params):
@@ -568,12 +585,55 @@ class ChiiProto(irc.IRCClient, ChiiBot):
             self.msg(channel, '\002operator\002: %s' % o)
             self.msg(channel, '\002idle\002: %s' % self._fmt_seconds(i))
             self.msg(channel, '\002channels\002: %s' % ' '.join(x for x in c))
+        del self._current_whois
 
     def irc_ERR_NOSUCHNICK(self, prefix, params):
-        channel, user = self._current_whois
-        if channel:
-            self.msg(channel, 'no such user \002%s' % user)
+        if hasattr(self, '_current_whois'):
+            channel, user = self._current_whois
+            if channel:
+                self.msg(channel, 'no such user \002%s' % user)
+            del self._current_whois
+        else:
+            pass
 
+    def _names(self, channel, action=None):
+        self._names_cb = (channel, action)
+        self.sendLine('NAMES %s' % channel)
+
+    def irc_RPL_NAMREPLY(self, prefix, params):
+        # get list of users minus prefix & minus you!
+        def strip_prefix(user):
+            for prefix in ('+', '@'):
+                if user.startswith(prefix):
+                    user = user[1:]
+            return user
+
+        channel, users = params[2], params[3]
+        self._names_list[channel] = set()
+        for user in users.split():
+            user = strip_prefix(user)
+            if user != self.nickname:
+                self._names_list[channel].add(user)
+
+    def irc_RPL_ENDOFNAMES(self, prefix, params):
+        def msg(*args):
+            self.msg(args[0], 'users in %s: %s' % (channel, ' '.join(self._names_list[channel])))
+
+        def mode(*args):
+            prefix, mode = args[0]
+            mode = mode * len(self._names_list[channel])
+            self.sendLine('MODE %s %s%s %s' % (channel, prefix, mode, ' '.join(self._names_list[channel])))
+
+        error = lambda *args: None
+
+        if hasattr(self, '_names_cb'):
+            channel, action = self._names_cb
+            if params[1] == channel and action:
+                dispatch = {
+                    'msg': msg,
+                    'mode': mode,
+                }.get(action[0], error)(action[1])
+                del self._names_cb
 
 class ChiiFactory(protocol.ClientFactory):
     """A factory for ChiiBots."""

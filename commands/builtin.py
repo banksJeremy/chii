@@ -49,11 +49,6 @@ def rehash(self, channel, nick, host, *args):
     self._rehash()
     return '\002rehash !!\002 rehashed'
 
-@command(restrict='admins')
-def quit(self, channel, nick, host, *args):
-    """u don't know me"""
-    self._quit()
-
 @command
 def help(self, channel, nick, host, command=None, *args):
     """returns help nogga"""
@@ -94,10 +89,21 @@ def topic(self, channel, nick, host, *args):
     self.topic(channel, ' '.join(args))
 
 @command(restrict='admins')
+def kick(self, channel, nick, host, *args):
+    """kick u"""
+    if len(args) == 1:
+        self.kick(args[0])
+    elif len(args) > 1:
+        self.kick(args[0], ' '.join(args[1:]))
+
+@command(restrict='admins')
 def mode(self, channel, nick, host, *args):
     """change the game"""
     new_mode = 'MODE %s' % ' '.join(args)
     self.sendLine(new_mode)
+
+def names(self, channel, nick, host, *args):
+    self._names(args[0], ('msg', channel))
 
 @command
 def whois(self, channel, nick, host, *args):
@@ -107,10 +113,79 @@ def whois(self, channel, nick, host, *args):
     else:
         return 'dong it rong'
 
-def op(self): pass
+@command('op', 'o', restrict='admins')
+def op(self, channel, nick, host, *args):
+    if args:
+        modes = 'o' * len(args)
+        users = ' '.join(args).strip()
+        if users == '*':
+            self._names(channel, ('mode', '+o'))
+        else:
+            self.sendLine('MODE %s +%s %s' % (channel, modes, users))
+    else:
+        self._names(channel, ('mode', '+o'))
 
-def deop(self): pass
+@command('deop', 'o-', restrict='admins')
+def deop(self, channel, nick, host, *args):
+    if args:
+        modes = 'o' * len(args)
+        users = ' '.join(args).strip()
+        if users == '*':
+            self._names(channel, ('mode', '-o'))
+        else:
+            self.sendLine('MODE %s -%s %s' % (channel, modes, users))
+    else:
+        self._names(channel, ('mode', '-o'))
 
-def voice(self): pass
+@command('voice', 'v', restrict='admins')
+def voice(self, channel, nick, host, *args):
+    if args:
+        modes = 'v' * len(args)
+        users = ' '.join(args).strip()
+        self.sendLine('MODE %s +%s %s' % (channel, modes, users))
 
-def devoice(self): pass
+@command('devoice', 'v-', restrict='admins')
+def devoice(self, channel, nick, host, *args):
+    if args:
+        modes = 'v' * len(args)
+        users = ' '.join(args).strip()
+        self.sendLine('MODE %s -%s %s' % (channel, modes, users))
+
+@command(restrict='admins')
+def nick(self, channel, nick, host, *args):
+    if args:
+        self.setNick(args[0])
+
+@command(restrict='admins')
+def notice(self, channel, nick, host, *args):
+    if len(args) > 1:
+        self.setNick(args[0], ' '.join(args[1:]))
+
+@command(restrict='admins')
+def ping(self, channel, nick, host, *args):
+    if len(args) == 1:
+        self._ping(args[0], 'hi', channel)
+    elif len(args) > 1:
+        self._ping(args[0], ' '.join(args[1:]), channel)
+
+@command(restrict='admins')
+def join(self, channel, nick, host, *args):
+    if len(args) == 1:
+        self.join(args[0])
+    elif len(args) > 1:
+        self.join(args[0], ' '.join(args[1:]))
+
+@command(restrict='admins')
+def leave(self, channel, nick, host, *args):
+    if len(args) == 1:
+        self.leave(args[0])
+    elif len(args) > 1:
+        self.leave(args[0], ' '.join(args[1:]))
+
+@command(restrict='admins')
+def quit(self, channel, nick, host, *args):
+    """u don't know me"""
+    if len(args) == 1:
+        self._quit()
+    elif len(args) > 1:
+        self._quit(' '.join(args[1:]))
