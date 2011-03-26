@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse, datetime, new, os, sys, time, traceback, zlib
+from fnmatch import fnmatch
 from collections import defaultdict
 
 from twisted.words.protocols import irc
@@ -393,12 +394,13 @@ class ChiiBot:
         return d
 
     # misc functions
-    def _check_permission(self, restrict_to, nick, host):
+    def _check_permission(self, role, nick, host):
         """checks whether nick, host, or nick!host has required role"""
-        if restrict_to is None:
+        if role is None:
             return True
-        for member in (nick, host, '!'.join((nick, host))):
-            if member in self.config['user_roles'][restrict_to]:
+        user = '!'.join(nick, host)
+        for rule in self.config['user_roles'][role]:
+            if fnmatch(user, rule):
                 return True
         return False
 
