@@ -281,7 +281,7 @@ class ChiiBot:
         if response and respond_to:
             # only return something if this event is caught in a channel
             self.msg(respond_to, response)
-            self.logger.log("<%s> %s" % (self.nickname, response), channel)
+            self.logger.log("<%s> %s" % (self.nickname, response), respond_to)
 
     def _task(self, name, func, repeat=60, scale=None):
         """executes looping task"""
@@ -398,7 +398,7 @@ class ChiiBot:
         """checks whether nick, host, or nick!host has required role"""
         if role is None:
             return True
-        user = '!'.join(nick, host)
+        user = '!'.join((nick, host))
         for rule in self.config['user_roles'][role]:
             if fnmatch(user, rule):
                 return True
