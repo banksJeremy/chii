@@ -185,7 +185,7 @@ def leave(self, channel, nick, host, *args):
 @command(restrict='admins')
 def quit(self, channel, nick, host, *args):
     """u don't know me"""
-    if len(args) == 1:
+    if args:
+        self._quit(' '.join(args))
+    else:
         self._quit()
-    elif len(args) > 1:
-        self._quit(' '.join(args[1:]))
