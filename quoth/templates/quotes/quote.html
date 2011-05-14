@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% if quote %}
+    <h1>{{ quote.quote|format_quote|safe }}</h1>
+
+        <div class='quote_info'>
+          <ul>
+            <li><a href="{% url quotes.views.quote quote.id %}">{{ quote.id }}</a><li>
+            <li>added by <a href="{% url quotes.views.nick quote.nick %}">{{ quote.nick }}</a><li>
+            <li>{{ quote.added }}<li>
+          </ul>
+        </div>
+
+{#
+    {% if error_message %}<p><strong>{{ error_message }}</strong></p>{% endif %}
+
+    <form action="/quotes/{{ quote.id }}/vote/" method="post">
+    <input type="submit" value="Vote" />
+    </form>
+#}
+{% else %}
+    <p>Quote not found.</p>
+{% endif %}
+
+{% endblock %}
