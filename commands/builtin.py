@@ -113,17 +113,9 @@ def whois(self, channel, nick, host, *args):
     else:
         return 'dong it rong'
 
-@command('op', 'o', restrict='admins')
+@command('op', 'o')
 def op(self, channel, nick, host, *args):
-    if args:
-        modes = 'o' * len(args)
-        users = ' '.join(args).strip()
-        if users == '*':
-            self._names(channel, ('mode', '+o'))
-        else:
-            self.sendLine('MODE %s +%s %s' % (channel, modes, users))
-    else:
-        self._names(channel, ('mode', '+o'))
+    self.sendLine('MODE %s +o %s' % (channel, nick))
 
 @command('deop', 'o-', restrict='admins')
 def deop(self, channel, nick, host, *args):

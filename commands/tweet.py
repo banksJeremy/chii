@@ -1,10 +1,11 @@
 from chii import config, command
-
+from fnmatch import fnmatch
 import tweepy
+
 CONSUMER_KEY = config['consumer_key'] or '7YQFmkKuayyGpGrqgQGcA'
 CONSUMER_SECRET = config['consumer_secret'] or '6KybR8lgUihTx5g305QZRXIid708JAhqBisYfkYEMy8'
 
-@command(restrict='admins')
+@command
 def tweet(self, channel, nick, host, *args):
     """tweet tweet"""
     def get_auth_url(auth):
@@ -32,15 +33,25 @@ def tweet(self, channel, nick, host, *args):
         token, secret = config['token'], config['secret']
         auth.set_access_token(token, secret)
         api = tweepy.API(auth)
-        api.update_status(' '.join(args))
-        return 'tweeted!'
+        try:
+            s = api.update_status(' '.join(args))
+            return 'tweeted! https://twitter.com/#!/%s/status/%d' % (str(s.author.screen_name), s.id)
+        except Exception as e:
+            return e
 
     auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-    config = self.config['tweet']
+    for user in self.config['tweet']:
+        if fnmatch('!'.join((nick, host)), user):
+            config = self.config['tweet'][user]
+            break
+    else:
+        config = self.config['tweet']['bot']
     if args and config:
         if 'token' and 'secret' in config:
             return update_status(args, auth, config)
         else:
             return save_oauth_token(auth, args[0])
+    elif config:
+        return 'tweet?'
     else:
         return get_auth_url(auth)
