@@ -1,5 +1,7 @@
 from chii import command, config, event
 
+from ast import literal_eval
+
 PERSIST = config['lambda_persist']
 SAVED_LAMBDAS = config['lambdas']
 HELPER_FUNCS = config['lambda_helpers']
@@ -68,7 +70,7 @@ def wrap_lambda(func, func_s, name, nick):
     """returns our wrapped lambda"""
     def wrapped_lambda(channel, nick, host, *args):
         try:
-            args = eval(' '.join(args) + ',') 
+            args = tuple(literal_eval(''.join(args)))
         except:
             pass
         return str(func(channel, nick, host, *args))
