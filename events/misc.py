@@ -1,4 +1,5 @@
 from chii import event
+import random
 
 @event('action')
 def trout(self, channel, nick, host, action):
@@ -24,3 +25,20 @@ def the_best(self, channel, nick, host, msg):
 def ya(self, channel, nick, host, msg):
     if msg.strip() == 'ya':
         self.msg(channel, 'ya')
+
+@event('msg')
+def cool(self, channel, nick, host, msg):
+    if msg.strip() == 'cool':
+        self.msg(channel, 'cool')
+
+@event('msg')
+def anders(self, channel, nick, host, msg):
+    ANDERS_IS_GAY = (
+        'haha what a fag',
+        'haha anders',
+        'what a gay',
+        '...eventually culminating in buttfuckery',
+        'oh no look anders got penis stuck in his face'
+    )
+    if 'anders' in msg.lower():
+        self.msg(channel, random.choice(ANDERS_IS_GAY))

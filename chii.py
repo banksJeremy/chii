@@ -498,28 +498,28 @@ class ChiiProto(irc.IRCClient, ChiiBot):
     def action(self, user, channel, msg):
         """This will get called when the bot sees someone do an action."""
         nick, host = user.split('!')
-        self._handle_event('action', channel, channel, nick, host, msg)
-
         if channel == self.nickname:
-            self.logger.log("* %s %s" % (nick, msg), nick)
-        else:
-            self.logger.log("* %s %s" % (nick, msg), channel)
+            channel = nick
+        self.logger.log("* %s %s" % (nick, msg), channel)
+        self._handle_event('action', args=(channel, nick, host, msg), respond_to=channel)
 
     def userJoined(self, user, channel):
         """Called when I see another user joining a channel."""
-        pass
+        self._handle_event('user_joined', args=(channel, user), respond_to=channel)
 
     def userLeft(self, user, channel):
         """Called when I see another user leaving a channel."""
-        pass
+        nick, host = user.split('!')
+        self._handle_event('user_left', args=(channel, user), respond_to=channel)
 
     def userQuit(self, user, quitMessage):
         """Called when I see another user disconnect from the network."""
-        pass
+        nick, host = user.split('!')
+        self._handle_event('user_quit', args=(nick, host, quitMessage))
 
     def userKicked(self, kickee, channel, kicker, message):
         """Called when I observe someone else being kicked from a channel."""
-        pass
+        self._handle_event('user_kicked', args=(channel, kickee, kicker, message))
 
     def _ping(self, user, message=None, channel=None):
         if channel:
@@ -539,6 +539,7 @@ class ChiiProto(irc.IRCClient, ChiiBot):
         old_nick = prefix.split('!')[0]
         new_nick = params[0]
         self.logger.log("%s is now known as %s" % (old_nick, new_nick))
+        self._handle_event('user_nick_changed', args=(old_nick, new_nick))
 
     def alterCollidedNick(self, nickname):
         """

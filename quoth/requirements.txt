@@ -1,0 +1,5 @@
+django
+-e git+https://github.com/mitsuhiko/jinja2.git#egg=jinja2
+-e git+https://github.com/dcramer/coffin.git#egg=coffin
+-e git+https://github.com/dcramer/django-paging.git#egg=django-paging
+MarkupSafe
