@@ -5,7 +5,7 @@ SAVED_LAMBDAS = config['lambdas']
 HELPER_FUNCS = config['lambda_helpers']
 
 # block dangerous stuff:
-DANGEROUS = (execfile, file, open, __import__, __file__, __builtins__, __package__, __name__, locals, vars, globals, input, raw_input)
+DANGEROUS = (eval, execfile, file, open, __import__, __file__, __builtins__, __package__, __name__, locals, vars, globals, input, raw_input)
 for x in DANGEROUS:
     x = None
 
