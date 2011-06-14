@@ -341,8 +341,12 @@ class ChiiBot:
 
     def _stop_tasks(self):
         """stops all tasks"""
-        for task in self.tasks:
-            self.running_tasks[task].stop()
+        if self.tasks:
+            for task in self.tasks:
+                try:
+                    self.running_tasks[task].stop()
+                except:
+                    pass
 
     # a couple of ways to do deferred messaging
     def batch_msg(self, channel, msg):

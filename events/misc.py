@@ -27,6 +27,16 @@ def ya(self, channel, nick, host, msg):
         self.msg(channel, 'ya')
 
 @event('msg')
+def xaimus(self, channel, nick, host, msg):
+    if 'xaimus' in msg:
+        self.msg(channel, 'huang')
+
+@event('msg')
+def muse(self, channel, nick, host, msg):
+    if 'muse' in msg:
+        self.msg(channel, 'U RANG %s' % nick)
+
+@event('msg')
 def cool(self, channel, nick, host, msg):
     if msg.strip() == 'cool':
         self.msg(channel, 'cool')
