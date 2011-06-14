@@ -1,13 +1,10 @@
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.core.urlresolvers import reverse
-from coffin.shortcuts import render_to_response
 
 from quoth.quotes.models import Quote
 
-import _mysql
-def get_db():
-    return _mysql.connect(host="localhost",user="quoteengine", passwd="gibmequotes",db="quotes")
+get_db = lambda *args: None
 
 def list_raw(request):
     db = get_db()
@@ -23,12 +20,12 @@ def list_orm(request):
 
 def index(request):
     queryset = Quote.objects.all().order_by('-id')
-    return render_to_response('quotes/index.html', {'request': request, 'queryset': queryset})
+    return render(request, 'quotes/index.html', {'request': request, 'queryset': queryset})
 
 def nick(request, nick):
     by_nick = Quote.objects.filter(nick__icontains=nick).order_by('-id')[:5]
     about_nick = Quote.objects.filter(quote__icontains=nick).order_by('-id')[:5]
-    return render_to_response('quotes/nick.html', {'by_nick': by_nick, 'about_nick': about_nick, 'nick': nick})
+    return render(request, 'quotes/nick.html', {'by_nick': by_nick, 'about_nick': about_nick, 'nick': nick})
 
 def search(request):
     if request.method == 'GET':
@@ -37,7 +34,7 @@ def search(request):
         query = request.POST.get('q', None)
     if query is not None:
         queryset = Quote.objects.filter(quote__icontains=query).order_by('-id')
-        return render_to_response('quotes/search.html', {'request': request, 'queryset': queryset, 'query': query})
+        return render(request, 'quotes/search.html', {'request': request, 'queryset': queryset, 'query': query})
     else:
         raise Http404
 
@@ -64,7 +61,7 @@ def index_raw(request, page=None):
     else:
         paging = None
 
-    return render_to_response('quotes/index_raw.html', {'paging': paging, 'quotes': quotes})
+    return render(request, 'quotes/index_raw.html', {'paging': paging, 'quotes': quotes})
 
 def quote_raw(request, quote_id):
     try:
@@ -82,7 +79,7 @@ def quote_orm(request, quote_id):
     
 def quote(request, quote_id):
     q = get_object_or_404(Quote, pk=quote_id)
-    return render_to_response('quotes/quote.html', {'quote': q})
+    return render(request, 'quotes/quote.html', {'quote': q})
 
 def vote(request, quote_id):
     q = get_object_or_404(Quote, pk=quote_id)
@@ -90,7 +87,7 @@ def vote(request, quote_id):
         selected_choice = q.choice_set.get(pk=request.POST['vote'])
     except (KeyError, Choice.DoesNotExist):
         # Redisplay the Quote voting form.
-        return render_to_response('quotes/quote.html', {
+        return render(request, 'quotes/quote.html', {
             'quote': q,
             'error_message': "You didn't select a quote.",
         })

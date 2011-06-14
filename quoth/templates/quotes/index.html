@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% set results = paginate(request, queryset) %}
+{% with paginate(request, my_queryset) as results %}
 
 {% block content %}
     <div class='quotes'>
@@ -12,7 +12,7 @@
             <li>{{ quote.added }}<li>
           </ul>
         </div> 
-        <div class='quote'>{{ quote.quote|format_quote|safe }}</div>
+        <div class='quote'>{{ quote.quote }}</div>
         <br />
     {% endfor %}
     </div>
@@ -22,3 +22,4 @@
   {{ results.paging }}
 {% endblock %}
 
+{% endwith %}

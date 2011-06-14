@@ -1,7 +1,8 @@
 # Django settings for quoth project.
 import os
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-DEBUG = False
+ROOT = os.path.dirname(os.path.abspath(__file__))
+
+DEBUG = True
 TEMPLATE_DEBUG = False
 
 SITE_NAME = 'quoth'
@@ -15,7 +16,7 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(PROJECT_DIR, 'quoth.db'),
+        'NAME': os.path.join(ROOT, 'quoth.db'),
         'USER': '',
         'PASSWORD': '',
         'HOST': '',
@@ -48,7 +49,7 @@ USE_L10N = True
 
 # Absolute filesystem path to the directory that will hold user-uploaded files.
 # Example: "/home/media/media.lawrence.com/media/"
-MEDIA_ROOT = os.path.join(PROJECT_DIR, 'media/')
+MEDIA_ROOT = os.path.join(ROOT, 'media/')
 
 # URL that handles the media served from MEDIA_ROOT. Make sure to use a
 # trailing slash.
@@ -59,7 +60,7 @@ MEDIA_URL = '/media/'
 # Don't put anything in this directory yourself; store your static files
 # in apps' "static/" subdirectories and in STATICFILES_DIRS.
 # Example: "/home/media/media.lawrence.com/static/"
-STATIC_ROOT = os.path.join(PROJECT_DIR, '/static-root/')
+STATIC_ROOT = os.path.join(ROOT, '/static-root/')
 
 # URL prefix for static files.
 # Example: "http://media.lawrence.com/static/"
@@ -75,7 +76,7 @@ STATICFILES_DIRS = (
     # Put strings here, like "/home/html/static" or "C:/www/django/static".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
-    os.path.join(PROJECT_DIR, 'static/'),
+    os.path.join(ROOT, 'static/'),
 )
 
 # List of finder classes that know how to find static files in
@@ -111,15 +112,19 @@ TEMPLATE_CONTEXT_PROCESSORS = (
 ROOT_URLCONF = 'quoth.urls'
 
 TEMPLATE_DIRS = (
-    os.path.join(PROJECT_DIR, 'templates'),
-    os.path.join(PROJECT_DIR, 'templates/base'),
+    os.path.join(ROOT, 'templates'),
+    os.path.join(ROOT, 'templates/base'),
 )
+
 
 JINJA2_GLOBALS = {
     'site_name': SITE_NAME,
+    'paginate': 'quoth.utils.jinja2.paging.paginate',
 }
 
 JINJA2_EXTENSIONS = (
+    'quoth.utils.jinja2.extensions.url',
+    'quoth.utils.jinja2.extensions.with_',
     'quoth.utils.jinja2.extensions.static_url',
     'jinja2.ext.AutoEscapeExtension',
 )
@@ -144,7 +149,6 @@ INSTALLED_APPS = (
     'django.contrib.staticfiles',
     'djinja.contrib.admin',
     'django.contrib.admin',
-#    'coffin',
     'paging',
     'quoth.quotes',
 )
