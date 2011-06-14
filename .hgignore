@@ -15,3 +15,5 @@ brain.txt
 src/**
 chii.config
 events/megahal.brain
+.git/*
+
