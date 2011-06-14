@@ -16,3 +16,5 @@ src/**
 chii.config
 events/megahal.brain
 quoth/quoth.db
+.git/*
+
